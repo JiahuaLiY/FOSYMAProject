@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 import org.graphstream.algorithm.Dijkstra;
 import org.graphstream.graph.Edge;
@@ -62,6 +64,8 @@ public class MapRepresentation implements Serializable {
 
 	private SerializableSimpleGraph<String, MapAttribute> sg;//used as a temporary dataStructure during migration
 
+	private CommunicationTracker communicationTracker;
+	
 
 	public MapRepresentation() {
 		//System.setProperty("org.graphstream.ui.renderer","org.graphstream.ui.j2dviewer.J2DGraphRenderer");
@@ -75,8 +79,12 @@ public class MapRepresentation implements Serializable {
 		//this.viewer = this.g.display();
 
 		this.nbEdges=0;
+		
+		this.communicationTracker = new CommunicationTracker();
 	}
 
+	
+	
 	/**
 	 * Add or replace a node and its attribute 
 	 * @param id unique identifier of the node
@@ -92,6 +100,7 @@ public class MapRepresentation implements Serializable {
 		n.clearAttributes();
 		n.setAttribute("ui.class", mapAttribute.toString());
 		n.setAttribute("ui.label",id);
+		communicationTracker.addNewNodeToPending(id); // add for send the particle graph
 	}
 
 	/**
@@ -211,11 +220,48 @@ public class MapRepresentation implements Serializable {
 			sg.addEdge(e.getId(), sn.getId(), tn.getId());
 		}	
 	}
+	
+	
+	//version modified for generating the partical graph
+	private SerializableSimpleGraph<String,MapAttribute> serializeParticalGraphTopology(String agentId) {
+		SerializableSimpleGraph<String,MapAttribute> spg= new SerializableSimpleGraph<String,MapAttribute>();
+		
+		Set<String> unsentNodes = this.communicationTracker.getUnSentNodes(agentId);
+		
+		for(String nodeId : unsentNodes) {
+			Node n = this.g.getNode(nodeId);
+			if (n != null) {
+				spg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
+			}
+		}
+		
+		Iterator<Edge> iterE=this.g.edges().iterator();
+		while (iterE.hasNext()){
+			Edge e=iterE.next();
+			Node sn=e.getSourceNode();
+			Node tn=e.getTargetNode();
+			if(unsentNodes.contains(sn.getId()) && unsentNodes.contains(tn.getId())) {
+				System.out.println("adding edges");
+				spg.addEdge(e.getId(), sn.getId(), tn.getId());
+			}
+		}	
+		
+		return spg;
+	}
 
 
-	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(){
-		serializeGraphTopology();
-		return this.sg;
+	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId){
+		if(this.communicationTracker.hasCommunicatedWith(agentId)) {
+			System.out.println("sending partical graph");
+			SerializableSimpleGraph<String,MapAttribute> spg = serializeParticalGraphTopology(agentId);
+			return spg;
+		}else {
+			System.out.println("sending total graph");
+			registerAgent(agentId);
+			serializeGraphTopology();
+			return this.sg;
+		}
+		
 	}
 
 	/**
@@ -271,7 +317,7 @@ public class MapRepresentation implements Serializable {
 	public void mergeMap(SerializableSimpleGraph<String, MapAttribute> sgreceived) {
 		//System.out.println("You should decide what you want to save and how");
 		//System.out.println("We currently blindy add the topology");
-
+		System.out.println("merging, size: "+sgreceived.getAllNodes().size());
 		for (SerializableNode<String, MapAttribute> n: sgreceived.getAllNodes()){
 			//System.out.println(n);
 			boolean alreadyIn =false;
@@ -313,7 +359,17 @@ public class MapRepresentation implements Serializable {
 				.filter(n -> n.getAttribute("ui.class")==MapAttribute.open.toString())
 				.findAny()).isPresent();
 	}
-
+	
+	
+	//new functions for communicationTracker
+	public synchronized void registerAgent(String agentId) {
+		this.communicationTracker.registerAgent(agentId);
+	}
+	
+	public synchronized void cleanSet(String agentId) {
+		this.communicationTracker.markNodesAsSent(agentId);
+	}
+	
 
 
 
