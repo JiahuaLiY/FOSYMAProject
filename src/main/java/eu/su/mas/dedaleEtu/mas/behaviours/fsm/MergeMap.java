@@ -6,34 +6,36 @@ import java.util.Objects;
 import dataStructures.serializableGraph.SerializableSimpleGraph;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
+import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
 import jade.core.behaviours.OneShotBehaviour;
 
 public class MergeMap extends OneShotBehaviour {
 
-  private static final long serialVersionUID = -5135676196541799987L;
+  private static final long serialVersionUID = -549026987950737349L;
+
+  @Override
+  public void action() {
+    var map = mapContainer.map();
+    for (var entry : receivedTopos.entrySet()) {
+      System.out.println(myAgent.getLocalName() + " merge the map from " + entry.getKey());
+      map.mergeMap(entry.getValue());
+    }
+    receivedTopos.clear();
+  }
+
   private final MapContainer mapContainer;
-  private final Map<String, SerializableSimpleGraph<String, MapAttribute>> bufferOfReceivedMaps;
+  private final Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos;
   
   public MergeMap(
       AbstractDedaleAgent agent,
       MapContainer mapContainer,
-      Map<String, SerializableSimpleGraph<String, MapAttribute>> bufferOfReceivedMaps) {
+      Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos) {
     super(agent);
+    
     Objects.requireNonNull(mapContainer);
-    Objects.requireNonNull(bufferOfReceivedMaps);
+    Objects.requireNonNull(receivedTopos);
     
     this.mapContainer = mapContainer;
-    this.bufferOfReceivedMaps = bufferOfReceivedMaps;
-  }
-  
-  @Override
-  public void action() {
-    var map = mapContainer.map();
-    for (var entry : bufferOfReceivedMaps.entrySet()) {
-      System.out.println(myAgent.getLocalName() + " merge the map <" + entry.getValue() + "> from " + entry.getKey());
-      map.mergeMap(entry.getValue());
-    }
-    
-    bufferOfReceivedMaps.clear();
+    this.receivedTopos = receivedTopos;
   }
 }

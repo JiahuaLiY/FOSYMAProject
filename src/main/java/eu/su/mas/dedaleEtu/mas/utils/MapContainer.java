@@ -1,4 +1,4 @@
-package eu.su.mas.dedaleEtu.mas.behaviours.fsm;
+package eu.su.mas.dedaleEtu.mas.utils;
 
 import java.io.Serializable;
 

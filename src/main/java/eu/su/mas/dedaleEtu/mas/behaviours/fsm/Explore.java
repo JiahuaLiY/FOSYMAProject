@@ -5,12 +5,16 @@ import java.util.Objects;
 import eu.su.mas.dedale.env.gs.GsLocation;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
+import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
 import jade.core.behaviours.OneShotBehaviour;
 
 public class Explore extends OneShotBehaviour {
 
   private static final long serialVersionUID = 7749048525683865672L;
   private final MapContainer mapContainer;
+  
+  private int nextStateTransition = 0;
+  private int interblockCnt = 0;
   
   public Explore(AbstractDedaleAgent agent, MapContainer mapContainer) {
     super(agent);
@@ -52,18 +56,30 @@ public class Explore extends OneShotBehaviour {
     }
     
     if (map.hasOpenNode()) {
+      nextStateTransition = 1;
       if (nextNodeID == null) {
         nextNodeID = map.getShortestPathToClosestOpenNode(position.getLocationId()).getFirst();
-        
-        if (!agent.moveTo(new GsLocation(nextNodeID))) {
-          System.out.println(myAgent.getLocalName() + " interblocking !");
-        }
       }
+      if (!agent.moveTo(new GsLocation(nextNodeID))) {
+        if (++interblockCnt > 10) {
+          System.out.println("oups");
+          System.out.println(map.nbNodes());
+          nextStateTransition = 0;
+        }
+        //System.out.println(myAgent.getLocalName() + " interblocking !");
+      }
+      else {
+        interblockCnt = 0;
+      }
+    }
+    else {
+      System.out.println(map.nbNodes());
+      nextStateTransition = 0;
     }
   }
   
   @Override
   public int onEnd() {
-    return mapContainer.map().hasOpenNode() ? 1 : 0;
+    return nextStateTransition;
   }
 }
