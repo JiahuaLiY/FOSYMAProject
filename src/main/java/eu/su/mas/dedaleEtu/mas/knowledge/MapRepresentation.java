@@ -46,6 +46,33 @@ public class MapRepresentation implements Serializable {
 		agent,open,closed;
 
 	}
+	
+	public class Tresor implements Serializable{
+		private static final long serialVersionUID = -904881439693109677L;
+		enum Type{
+			or, diamand
+		}
+		private Type type;
+		private boolean isLocked;
+		private boolean isCollected;
+		
+		public Tresor() {
+			this.type = Type.or;
+			this.isLocked = true;
+			this.isCollected = false;
+		}
+		
+		public void collectTresor() {
+			this.isCollected = true;
+		}
+		
+		public void unLockTresor() {
+			this.isLocked = false;
+		}
+		
+		
+		
+	}
 
 	private static final long serialVersionUID = -1333959882640838272L;
 
@@ -57,6 +84,7 @@ public class MapRepresentation implements Serializable {
 	private String nodeStyle_open = "node.agent {"+"fill-color: forestgreen;"+"}";
 	private String nodeStyle_agent = "node.open {"+"fill-color: blue;"+"}";
 	private String nodeStyle=defaultNodeStyle+nodeStyle_agent+nodeStyle_open;
+	
 
 	private Graph g; //data structure non serializable
 	private Viewer viewer; //ref to the display,  non serializable
@@ -66,6 +94,8 @@ public class MapRepresentation implements Serializable {
 
 	private CommunicationTracker communicationTracker;
 	
+	private HashMap<String, Tresor> tresor;
+	private long timestamp;
 
 	public MapRepresentation() {
 		//System.setProperty("org.graphstream.ui.renderer","org.graphstream.ui.j2dviewer.J2DGraphRenderer");
@@ -81,6 +111,9 @@ public class MapRepresentation implements Serializable {
 		this.nbEdges=0;
 		
 		this.communicationTracker = new CommunicationTracker();
+		
+		this.tresor = new HashMap<String, Tresor>();
+		this.timestamp = System.currentTimeMillis();
 	}
 
 	
@@ -134,6 +167,10 @@ public class MapRepresentation implements Serializable {
 		} catch(ElementNotFoundException e3){
 
 		}
+	}
+	
+	public void addTresor(String idNode, Tresor tresorType) {
+		this.tresor.put(idNode, tresorType);
 	}
 
 	/**
@@ -240,7 +277,15 @@ public class MapRepresentation implements Serializable {
 			Edge e=iterE.next();
 			Node sn=e.getSourceNode();
 			Node tn=e.getTargetNode();
-			if(unsentNodes.contains(sn.getId()) && unsentNodes.contains(tn.getId())) {
+			if(unsentNodes.contains(sn.getId()) || unsentNodes.contains(tn.getId())) {
+				if(!unsentNodes.contains(sn)) {
+					spg.addNode(sn.getId(), MapAttribute.valueOf((String)sn.getAttribute("ui.class")));
+				}
+				
+				if(!unsentNodes.contains(tn)) {
+					spg.addNode(tn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
+				}
+				
 				System.out.println("adding edges");
 				spg.addEdge(e.getId(), sn.getId(), tn.getId());
 			}
@@ -262,6 +307,11 @@ public class MapRepresentation implements Serializable {
 			return this.sg;
 		}
 		
+	}
+	
+	public DataShare getSerializedData(String agenntId) {
+		return new DataShare(this.getSerializableGraph(agenntId),
+				this.tresor);
 	}
 
 	/**
@@ -348,6 +398,17 @@ public class MapRepresentation implements Serializable {
 			}
 		}
 		//System.out.println("Merge done");
+	}
+	
+	public void mergeTresor(HashMap<String, Tresor> tresors) {
+		
+	}
+	
+	public void mergeAllData(DataShare ds) {
+		mergeMap(ds.getMap());
+		if(ds.isNewData(timestamp)) {
+			mergeTresor(ds.getTresors());
+		}
 	}
 
 	/**
