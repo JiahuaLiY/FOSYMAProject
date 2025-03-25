@@ -112,6 +112,7 @@ public class MapRepresentation implements Serializable {
 		
 		this.communicationTracker = new CommunicationTracker();
 		
+		
 		this.tresor = new HashMap<String, Tresor>();
 		this.timestamp = System.currentTimeMillis();
 	}
@@ -256,6 +257,9 @@ public class MapRepresentation implements Serializable {
 			Node tn=e.getTargetNode();
 			sg.addEdge(e.getId(), sn.getId(), tn.getId());
 		}	
+		
+		var a = g.nodes().map(Node::toString).collect(Collectors.joining("\n"));
+		System.out.println(a);
 	}
 	
 	
@@ -265,12 +269,14 @@ public class MapRepresentation implements Serializable {
 		
 		Set<String> unsentNodes = this.communicationTracker.getUnSentNodes(agentId);
 		
+		if(unsentNodes.isEmpty())
+			return spg;
+		
 		for(String nodeId : unsentNodes) {
 			Node n = this.g.getNode(nodeId);
-			if (n != null) {
-				spg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
-			}
+			spg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
 		}
+		System.out.println(agentId + " " + unsentNodes);
 		
 		Iterator<Edge> iterE=this.g.edges().iterator();
 		while (iterE.hasNext()){
@@ -279,7 +285,7 @@ public class MapRepresentation implements Serializable {
 			Node tn=e.getTargetNode();
 			if(unsentNodes.contains(sn.getId()) || unsentNodes.contains(tn.getId())) {
 				if(!unsentNodes.contains(sn)) {
-					spg.addNode(sn.getId(), MapAttribute.valueOf((String)sn.getAttribute("ui.class")));
+					spg.addNode(sn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
 				}
 				
 				if(!unsentNodes.contains(tn)) {
@@ -288,6 +294,7 @@ public class MapRepresentation implements Serializable {
 				
 				System.out.println("adding edges");
 				spg.addEdge(e.getId(), sn.getId(), tn.getId());
+				System.out.println("edges : " + e.getId() );
 			}
 		}	
 		
@@ -296,16 +303,18 @@ public class MapRepresentation implements Serializable {
 
 
 	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId){
-		if(this.communicationTracker.hasCommunicatedWith(agentId)) {
-			System.out.println("sending partical graph");
-			SerializableSimpleGraph<String,MapAttribute> spg = serializeParticalGraphTopology(agentId);
-			return spg;
-		}else {
-			System.out.println("sending total graph");
-			registerAgent(agentId);
-			serializeGraphTopology();
-			return this.sg;
+		
+		 if(this.communicationTracker.hasCommunicatedWith(agentId)) {
+			 System.out.println("sending partical graph");
+			 SerializableSimpleGraph<String,MapAttribute> spg =
+			 serializeParticalGraphTopology(agentId); return spg; 
 		}
+		 else {
+			 System.out.println("sending total graph"); registerAgent(agentId);
+			 serializeGraphTopology(); return this.sg; 
+		}
+		 
+		
 		
 	}
 	
@@ -375,6 +384,7 @@ public class MapRepresentation implements Serializable {
 			Node newnode=null;
 			try {
 				newnode=this.g.addNode(n.getNodeId());
+				this.communicationTracker.addNewNodeToPending(n.getNodeId());
 			}	catch(IdAlreadyInUseException e) {
 				alreadyIn=true;
 				//System.out.println("Already in"+n.getNodeId());
