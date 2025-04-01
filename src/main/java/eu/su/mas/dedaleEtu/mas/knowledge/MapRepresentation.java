@@ -442,6 +442,8 @@ public class MapRepresentation implements Serializable {
 	}
 	
 
-
+	public long nbNodes() {
+	  return g.nodes().count();
+	}
 
 }

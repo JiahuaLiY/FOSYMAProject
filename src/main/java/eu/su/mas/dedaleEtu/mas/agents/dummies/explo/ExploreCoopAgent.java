@@ -1,15 +1,27 @@
 package eu.su.mas.dedaleEtu.mas.agents.dummies.explo;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import dataStructures.serializableGraph.SerializableSimpleGraph;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedale.mas.agent.behaviours.platformManagment.*;
 
 import eu.su.mas.dedaleEtu.mas.behaviours.ExploCoopBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.Broadcast;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.EndExplore;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.Explore;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.MergeMap;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareMap;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareReceiveManagement;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation;
-
+import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
+import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
+import eu.su.mas.dedaleEtu.mas.utils.WaitingList;
 import jade.core.behaviours.Behaviour;
+import jade.core.behaviours.FSMBehaviour;
 
 /**
  * <pre>
@@ -74,7 +86,30 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
 		 * 
 		 ************************************************/
 		
-		lb.add(new ExploCoopBehaviour(this,this.myMap,list_agentNames));
+		// lb.add(new ExploCoopBehaviour(this,this.myMap,list_agentNames));
+    var fsm = new FSMBehaviour();
+    var mapContainer = new MapContainer();
+    var waitingList = new WaitingList();
+    var receivedTopos = new HashMap<String, SerializableSimpleGraph<String, MapAttribute>>();
+    var shareWith = new ArrayList<String>();
+    
+    fsm.registerFirstState(new Explore(this, mapContainer), "EXPLORE");
+    fsm.registerState(new Broadcast(this, list_agentNames, waitingList), "BROADCAST");
+    fsm.registerState(new ShareReceiveManagement(this, waitingList, receivedTopos, shareWith, mapContainer), "SHARE-RECEIVE-MANAGEMENT");
+    fsm.registerState(new ShareMap(this, mapContainer, shareWith), "SHARE");
+    fsm.registerState(new MergeMap(this, mapContainer, receivedTopos), "MERGE");
+    fsm.registerLastState(new EndExplore(this), "END-EXPLORE");
+    
+    fsm.registerTransition("EXPLORE", "BROADCAST", 1);
+    fsm.registerTransition("EXPLORE", "END-EXPLORE", 0);
+    fsm.registerDefaultTransition("BROADCAST", "SHARE-RECEIVE-MANAGEMENT");
+    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "EXPLORE", 0);
+    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "SHARE", 1);
+    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "MERGE", 2);
+    fsm.registerDefaultTransition("SHARE", "SHARE-RECEIVE-MANAGEMENT");
+    fsm.registerDefaultTransition("MERGE", "SHARE-RECEIVE-MANAGEMENT");
+    
+    lb.add(fsm);
 
 		
 		
