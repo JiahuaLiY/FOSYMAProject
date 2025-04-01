@@ -322,15 +322,10 @@ public class MapRepresentation implements Serializable {
 
 	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId){
 		
-		 if(this.communicationTracker.hasCommunicatedWith(agentId)) {
-			 System.out.println("sending partical graph to agent :" + agentId);
-			 SerializableSimpleGraph<String,MapAttribute> spg =
-			 serializeParticalGraphTopology(agentId); return spg; 
-		}
-		 else {
+
 			 System.out.println("sending total graph to agent :"+ agentId); registerAgent(agentId);
 			 serializeGraphTopology(); return this.sg; 
-		}
+
 		 
 		
 		

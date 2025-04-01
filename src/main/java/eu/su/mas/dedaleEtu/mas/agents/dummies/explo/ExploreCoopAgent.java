@@ -16,6 +16,7 @@ import eu.su.mas.dedaleEtu.mas.behaviours.fsm.Explore;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsm.MergeMap;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareMap;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareReceiveManagement;
+import eu.su.mas.dedaleEtu.mas.knowledge.DataShare;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
 import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
@@ -90,7 +91,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
     var fsm = new FSMBehaviour();
     var mapContainer = new MapContainer();
     var waitingList = new WaitingList();
-    var receivedTopos = new HashMap<String, SerializableSimpleGraph<String, MapAttribute>>();
+    var receivedTopos = new HashMap<String, DataShare>();
     var shareWith = new ArrayList<String>();
     
     fsm.registerFirstState(new Explore(this, mapContainer), "EXPLORE");

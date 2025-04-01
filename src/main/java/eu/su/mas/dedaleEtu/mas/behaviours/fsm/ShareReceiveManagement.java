@@ -7,6 +7,7 @@ import java.util.Objects;
 
 import dataStructures.serializableGraph.SerializableSimpleGraph;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
+import eu.su.mas.dedaleEtu.mas.knowledge.DataShare;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
 import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
 import eu.su.mas.dedaleEtu.mas.utils.WaitingList;
@@ -80,7 +81,7 @@ public class ShareReceiveManagement extends OneShotBehaviour {
   
   private final MapContainer mapContainer;
   private final WaitingList waitingList;
-  private final Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos;
+  private final Map<String, DataShare> receivedTopos;
   private final List<String> sharedWith;
   
   public final static long WAIT_DURATION_FOR_TOPOLOGY_SHARE_MS = 100;
@@ -93,7 +94,7 @@ public class ShareReceiveManagement extends OneShotBehaviour {
   public ShareReceiveManagement(
       AbstractDedaleAgent agent,
       WaitingList waitingList,
-      Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos,
+      Map<String, DataShare> receivedTopos,
       List<String> sharedWith,
       MapContainer mapContainer) {
     super(agent);
@@ -118,10 +119,10 @@ public class ShareReceiveManagement extends OneShotBehaviour {
     
     var senders = new ArrayList<String>();
     while ((msg = myAgent.receive(msgTemplate)) != null) {
-      SerializableSimpleGraph<String, MapAttribute> receivedMap = null;
+      DataShare receivedMap = null;
       
       try {
-        receivedMap = (SerializableSimpleGraph<String, MapAttribute>)msg.getContentObject();
+        receivedMap = (DataShare)msg.getContentObject();
       } catch (Exception e) {
         e.printStackTrace();
       }

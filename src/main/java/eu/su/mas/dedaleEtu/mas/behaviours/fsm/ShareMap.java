@@ -48,7 +48,7 @@ public class ShareMap extends OneShotBehaviour {
     msg.setSender(myAgent.getAID());
     msg.addReceiver(new AID(agentName, AID.ISLOCALNAME));
     
-    var graph = map.getSerializableGraph(agentName);
+    var graph = map.getSerializedData(agentName);
     
     try {
       msg.setContentObject(graph);
