@@ -49,17 +49,26 @@ public class MapRepresentation implements Serializable {
 	
 	public class Tresor implements Serializable{
 		private static final long serialVersionUID = -904881439693109677L;
-		enum Type{
-			or, diamand
+		public enum Type{
+			or, diamond, empty
 		}
 		private Type type;
 		private boolean isLocked;
 		private boolean isCollected;
 		
-		public Tresor() {
-			this.type = Type.or;
+		public Tresor(String tresorType) {
+			if(tresorType == "or")
+				this.type = Type.or;
+			else
+				this.type = Type.diamond;
 			this.isLocked = true;
 			this.isCollected = false;
+		}
+		
+		public Tresor(String tresorType, boolean isLocked, boolean isCollected) {
+			this(tresorType);
+			this.isLocked = isLocked;
+			this.isCollected = isCollected;
 		}
 		
 		public void collectTresor() {
@@ -68,6 +77,11 @@ public class MapRepresentation implements Serializable {
 		
 		public void unLockTresor() {
 			this.isLocked = false;
+		}
+		
+		
+		public Tresor copyTresor(Tresor tresor) {
+			return new Tresor(tresor.type.toString(), tresor.isLocked, tresor.isCollected);
 		}
 		
 		
@@ -243,7 +257,7 @@ public class MapRepresentation implements Serializable {
 	/**
 	 * Before sending the agent knowledge of the map it should be serialized.
 	 */
-	private void serializeGraphTopology() {
+	private synchronized void serializeGraphTopology() {
 		this.sg= new SerializableSimpleGraph<String,MapAttribute>();
 		Iterator<Node> iter=this.g.iterator();
 		while(iter.hasNext()){
@@ -264,21 +278,24 @@ public class MapRepresentation implements Serializable {
 	
 	
 	//version modified for generating the partical graph
-	private SerializableSimpleGraph<String,MapAttribute> serializeParticalGraphTopology(String agentId) {
+	private synchronized SerializableSimpleGraph<String,MapAttribute> serializeParticalGraphTopology(String agentId) {
 		SerializableSimpleGraph<String,MapAttribute> spg= new SerializableSimpleGraph<String,MapAttribute>();
 		
 		Set<String> unsentNodes = this.communicationTracker.getUnSentNodes(agentId);
 		
+		System.out.println("HashCode : " + System.identityHashCode(this.g));
 		if(unsentNodes.isEmpty())
 			return spg;
 		
 		for(String nodeId : unsentNodes) {
 			Node n = this.g.getNode(nodeId);
 			spg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
+			System.out.println(n.getId()+"node's class"+n.getAttribute("ui.class"));
 		}
-		System.out.println(agentId + " " + unsentNodes);
+		System.out.println("to " + agentId + " : " + unsentNodes);
 		
 		Iterator<Edge> iterE=this.g.edges().iterator();
+		System.out.println("adding edges");
 		while (iterE.hasNext()){
 			Edge e=iterE.next();
 			Node sn=e.getSourceNode();
@@ -286,15 +303,16 @@ public class MapRepresentation implements Serializable {
 			if(unsentNodes.contains(sn.getId()) || unsentNodes.contains(tn.getId())) {
 				if(!unsentNodes.contains(sn)) {
 					spg.addNode(sn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
+					System.out.println(sn.getId()+"node's class"+sn.getAttribute("ui.class"));
 				}
 				
 				if(!unsentNodes.contains(tn)) {
 					spg.addNode(tn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
+					System.out.println(tn.getId()+"node's class"+tn.getAttribute("ui.class"));
 				}
 				
-				System.out.println("adding edges");
 				spg.addEdge(e.getId(), sn.getId(), tn.getId());
-				System.out.println("edges : " + e.getId() );
+				System.out.print("edges : " + e.getId() );
 			}
 		}	
 		
@@ -305,12 +323,12 @@ public class MapRepresentation implements Serializable {
 	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId){
 		
 		 if(this.communicationTracker.hasCommunicatedWith(agentId)) {
-			 System.out.println("sending partical graph");
+			 System.out.println("sending partical graph to agent :" + agentId);
 			 SerializableSimpleGraph<String,MapAttribute> spg =
 			 serializeParticalGraphTopology(agentId); return spg; 
 		}
 		 else {
-			 System.out.println("sending total graph"); registerAgent(agentId);
+			 System.out.println("sending total graph to agent :"+ agentId); registerAgent(agentId);
 			 serializeGraphTopology(); return this.sg; 
 		}
 		 
@@ -382,9 +400,9 @@ public class MapRepresentation implements Serializable {
 			boolean alreadyIn =false;
 			//1 Add the node
 			Node newnode=null;
+			System.out.println("adding node : " + n.getNodeId());
 			try {
 				newnode=this.g.addNode(n.getNodeId());
-				this.communicationTracker.addNewNodeToPending(n.getNodeId());
 			}	catch(IdAlreadyInUseException e) {
 				alreadyIn=true;
 				//System.out.println("Already in"+n.getNodeId());
@@ -396,9 +414,12 @@ public class MapRepresentation implements Serializable {
 				newnode=this.g.getNode(n.getNodeId());
 				//3 check its attribute. If it is below the one received, update it.
 				if (((String) newnode.getAttribute("ui.class"))==MapAttribute.closed.toString() || n.getNodeContent().toString()==MapAttribute.closed.toString()) {
+					System.out.println("modifiy node class to closed");
 					newnode.setAttribute("ui.class",MapAttribute.closed.toString());
 				}
 			}
+			
+			System.out.println("node class : " + newnode.getAttribute("ui.class"));
 		}
 
 		//4 now that all nodes are added, we can add edges
@@ -410,8 +431,18 @@ public class MapRepresentation implements Serializable {
 		//System.out.println("Merge done");
 	}
 	
-	public void mergeTresor(HashMap<String, Tresor> tresors) {
+	public void addTresor(String nodeId, String tresorType) {
+		this.tresor.put(nodeId, new Tresor(tresorType));
+	}
+	
+	public void updateTresorData(String nodeId, boolean locked, boolean collected) {
 		
+	}
+	
+	public void mergeTresor(HashMap<String, Tresor> tresors) {
+		for(Map.Entry<String, Tresor> entry : tresors.entrySet()) {
+			this.tresor.put(entry.getKey(), entry.getValue());
+		}
 	}
 	
 	public void mergeAllData(DataShare ds) {
