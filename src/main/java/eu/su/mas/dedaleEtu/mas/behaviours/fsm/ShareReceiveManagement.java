@@ -8,6 +8,7 @@ import java.util.Objects;
 import dataStructures.serializableGraph.SerializableSimpleGraph;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
+import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
 import eu.su.mas.dedaleEtu.mas.utils.WaitingList;
 import jade.core.AID;
 import jade.core.behaviours.OneShotBehaviour;
@@ -22,7 +23,7 @@ public class ShareReceiveManagement extends OneShotBehaviour {
   public void action() {
     nextStateTransition = 0;
 
-    if (receivedTopos.isEmpty()) {
+    /*if (receivedTopos.isEmpty()) {
       processReceivedTopos(); // merge map
       processBroadcastAck(); // share map
       
@@ -31,6 +32,18 @@ public class ShareReceiveManagement extends OneShotBehaviour {
     }
     else {
       nextStateTransition = 2;
+    }*/
+    if (sharedWith.isEmpty()) {
+      processReceivedTopos(); // merge map
+      if (receivedTopos.isEmpty()) {
+        processBroadcastAck(); // share map
+      }
+      
+      processTopoShareAck();
+      processBroadcast();
+    }
+    else {
+      nextStateTransition = SHARE_TRANSITION;
     }
     /*
     processReceivedTopos();
@@ -57,29 +70,40 @@ public class ShareReceiveManagement extends OneShotBehaviour {
   
   @Override
   public int onEnd() {
+    if (nextStateTransition == END_TRANSITION) {
+      waitingList.clearAllTasks();
+    }
     return nextStateTransition;
   }
 
-  private int nextStateTransition = 0;
+  private int nextStateTransition = END_TRANSITION;
   
+  private final MapContainer mapContainer;
   private final WaitingList waitingList;
   private final Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos;
   private final List<String> sharedWith;
   
-  private final static long WAIT_DURATION_FOR_TOPOLOGY_SHARE_MS = 25;
-  //private final static long WAIT_DURATION_FOR_TOPOLOGY_SHARE_ACK_MS = 10;
+  public final static long WAIT_DURATION_FOR_TOPOLOGY_SHARE_MS = 100;
+  public final static long WAIT_DURATION_FOR_TOPOLOGY_SHARE_ACK_MS = 50;
+  
+  public final static int END_TRANSITION = 0;
+  public final static int SHARE_TRANSITION = 1;
+  public final static int MERGE_TRANSITION = 2;
   
   public ShareReceiveManagement(
       AbstractDedaleAgent agent,
       WaitingList waitingList,
       Map<String, SerializableSimpleGraph<String, MapAttribute>> receivedTopos,
-      List<String> sharedWith) {
+      List<String> sharedWith,
+      MapContainer mapContainer) {
     super(agent);
     
+    Objects.requireNonNull(mapContainer);
     Objects.requireNonNull(waitingList);
     Objects.requireNonNull(receivedTopos);
     Objects.requireNonNull(sharedWith);
     
+    this.mapContainer = mapContainer;
     this.waitingList = waitingList;
     this.receivedTopos = receivedTopos;
     this.sharedWith = sharedWith;
@@ -105,6 +129,7 @@ public class ShareReceiveManagement extends OneShotBehaviour {
       var senderName = msg.getSender().getLocalName();
       receivedTopos.put(senderName, receivedMap);
       senders.add(senderName);
+      waitingList.remove(senderName, "TOPO-SHARE");
     }
     
     if (!senders.isEmpty()) {
@@ -142,9 +167,11 @@ public class ShareReceiveManagement extends OneShotBehaviour {
     while ((msg = myAgent.receive(msgTemplate)) != null) {
       var senderName = msg.getSender().getLocalName();
       
-      // waitingList.add(senderName, "TOPO-SHARE-ACK", WAIT_DURATION_FOR_TOPOLOGY_SHARE_ACK_MS);
-      waitingList.remove(senderName, "TOPO-SHARE");
+      //if (waitingList.remove(senderName, "BROADCAST-ACK")) {
+      waitingList.remove(senderName, "BROADCAST-ACK");
+      waitingList.add(senderName, "TOPO-SHARE", "TOPO-SHARE-ACK", WAIT_DURATION_FOR_TOPOLOGY_SHARE_ACK_MS);
       sharedWith.add(senderName);
+      //}
     }
     
     if (!sharedWith.isEmpty()) {
@@ -153,7 +180,19 @@ public class ShareReceiveManagement extends OneShotBehaviour {
   }
   
   private void processTopoShareAck() {
-    // to do
+    var msgTemplate = MessageTemplate.and(
+        MessageTemplate.MatchProtocol("TOPO-SHARE-ACK"),
+        MessageTemplate.MatchPerformative(ACLMessage.INFORM));
+    ACLMessage msg = null;
+    
+    while ((msg = myAgent.receive(msgTemplate)) != null) {
+      var senderName = msg.getSender().getLocalName();
+      
+      if (waitingList.remove(senderName, "TOPO-SHARE-ACK")) {
+        // clean map;
+        mapContainer.map().cleanSet(senderName);
+      }
+    }
   }
   
   private void sendAck(List<String> receivers, String ackProtocol) {

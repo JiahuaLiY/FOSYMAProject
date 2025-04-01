@@ -95,7 +95,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
     
     fsm.registerFirstState(new Explore(this, mapContainer), "EXPLORE");
     fsm.registerState(new Broadcast(this, list_agentNames, waitingList), "BROADCAST");
-    fsm.registerState(new ShareReceiveManagement(this, waitingList, receivedTopos, shareWith), "SHARE-RECEIVE-MANAGEMENT");
+    fsm.registerState(new ShareReceiveManagement(this, waitingList, receivedTopos, shareWith, mapContainer), "SHARE-RECEIVE-MANAGEMENT");
     fsm.registerState(new ShareMap(this, mapContainer, shareWith), "SHARE");
     fsm.registerState(new MergeMap(this, mapContainer, receivedTopos), "MERGE");
     fsm.registerLastState(new EndExplore(this), "END-EXPLORE");

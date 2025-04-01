@@ -35,7 +35,7 @@ public class Explore extends OneShotBehaviour {
     var observations = agent.observe();
     
     try {
-      agent.doWait(100);
+      agent.doWait(200);
     } catch (Exception e) {
       e.printStackTrace();
     }

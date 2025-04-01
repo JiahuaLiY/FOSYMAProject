@@ -36,7 +36,7 @@ public class Broadcast extends OneShotBehaviour {
   private final WaitingList waitingList;
   private int cycleCnt = 0;
   
-  private final static long WAIT_DURATION_FOR_BROADCAST_MS = 10;
+  private final static long WAIT_DURATION_FOR_BROADCAST_MS = 50;
   
   public Broadcast(
       AbstractDedaleAgent agent,

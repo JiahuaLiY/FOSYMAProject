@@ -56,7 +56,7 @@ public class ShareMap extends OneShotBehaviour {
         e.printStackTrace();
     }
     ((AbstractDedaleAgent)myAgent).sendMessage(msg);
-    map.cleanSet(agentName); // to do.
+    //map.cleanSet(agentName); // to do.
     System.out.println("ok for " + agentName);
   }
 }
