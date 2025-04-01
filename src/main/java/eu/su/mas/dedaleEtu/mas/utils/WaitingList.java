@@ -31,10 +31,10 @@ public final class WaitingList implements Serializable {
     waitingTasks.clear();
   }
   
-  public void remove(String name, String waitForProtocol) {
+  public boolean remove(String name, String waitForProtocol) {
     Objects.requireNonNull(name);
     Objects.requireNonNull(waitForProtocol);
-    waitingTasks.removeIf(task -> task.name.equals(name) 
+    return waitingTasks.removeIf(task -> task.name.equals(name) 
         && task.waitedProtocol.equals(waitForProtocol));
   }
   
@@ -82,14 +82,6 @@ public final class WaitingList implements Serializable {
     
     public boolean isNotDone() {
       return (System.currentTimeMillis() - startTime) < waitDuration;
-    }
-    
-    public String name() {
-      return name;
-    }
-    
-    public String waitedProtocol() {
-      return waitedProtocol;
     }
     
     @Override
