@@ -2,10 +2,12 @@ package eu.su.mas.dedaleEtu.mas.knowledge;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,6 +27,7 @@ import org.graphstream.ui.view.Viewer.CloseFramePolicy;
 
 import dataStructures.serializableGraph.*;
 import dataStructures.tuple.Couple;
+import eu.su.mas.dedaleEtu.mas.utils.UnorderedCouple;
 import javafx.application.Platform;
 
 /**
@@ -43,94 +46,45 @@ public class MapRepresentation implements Serializable {
 	 */
 
 	public enum MapAttribute {	
-		agent,open,closed;
-
+		agent,
+		open,
+		closed;
 	}
 	
-	public class Tresor implements Serializable{
-		private static final long serialVersionUID = -904881439693109677L;
-		public enum Type{
-			or, diamond, empty
-		}
-		private Type type;
-		private boolean isLocked;
-		private boolean isCollected;
-		
-		public Tresor(String tresorType) {
-			if(tresorType == "or")
-				this.type = Type.or;
-			else
-				this.type = Type.diamond;
-			this.isLocked = true;
-			this.isCollected = false;
-		}
-		
-		public Tresor(String tresorType, boolean isLocked, boolean isCollected) {
-			this(tresorType);
-			this.isLocked = isLocked;
-			this.isCollected = isCollected;
-		}
-		
-		public void collectTresor() {
-			this.isCollected = true;
-		}
-		
-		public void unLockTresor() {
-			this.isLocked = false;
-		}
-		
-		
-		public Tresor copyTresor(Tresor tresor) {
-			return new Tresor(tresor.type.toString(), tresor.isLocked, tresor.isCollected);
-		}
-		
-		
-		
-	}
-
 	private static final long serialVersionUID = -1333959882640838272L;
 
 	/*********************************
 	 * Parameters for graph rendering
 	 ********************************/
 
-	private String defaultNodeStyle= "node {"+"fill-color: black;"+" size-mode:fit;text-alignment:under; text-size:14;text-color:white;text-background-mode:rounded-box;text-background-color:black;}";
-	private String nodeStyle_open = "node.agent {"+"fill-color: forestgreen;"+"}";
-	private String nodeStyle_agent = "node.open {"+"fill-color: blue;"+"}";
-	private String nodeStyle=defaultNodeStyle+nodeStyle_agent+nodeStyle_open;
+	private String defaultNodeStyle = "node {" + "fill-color: black;" + " size-mode:fit;text-alignment:under; text-size:14;text-color:white;text-background-mode:rounded-box;text-background-color:black;}";
+	private String nodeStyle_open = "node.agent {" + "fill-color: forestgreen;" + "}";
+	private String nodeStyle_agent = "node.open {" + "fill-color: blue;" + "}";
+	private String nodeStyle = defaultNodeStyle+nodeStyle_agent+nodeStyle_open;
 	
 
-	private Graph g; //data structure non serializable
+	private Graph graph; //data structure non serializable
 	private Viewer viewer; //ref to the display,  non serializable
 	private Integer nbEdges;//used to generate the edges ids
 
 	private SerializableSimpleGraph<String, MapAttribute> sg;//used as a temporary dataStructure during migration
-
-	private CommunicationTracker communicationTracker;
 	
-	private HashMap<String, Tresor> tresor;
-	private long timestamp;
+	private final Map<UnorderedCouple<String>, String> edges = new HashMap<>();
+	
+	private final Map<String, MapAttribute> nodes = new HashMap<>();
 
 	public MapRepresentation() {
 		//System.setProperty("org.graphstream.ui.renderer","org.graphstream.ui.j2dviewer.J2DGraphRenderer");
 		System.setProperty("org.graphstream.ui", "javafx");
-		this.g= new SingleGraph("My world vision");
-		this.g.setAttribute("ui.stylesheet",nodeStyle);
+		this.graph = new SingleGraph("My world vision");
+		this.graph.setAttribute("ui.stylesheet",nodeStyle);
 
 		Platform.runLater(() -> {
 			openGui();
 		});
 		//this.viewer = this.g.display();
-
 		this.nbEdges=0;
-		
-		this.communicationTracker = new CommunicationTracker();
-		
-		
-		this.tresor = new HashMap<String, Tresor>();
-		this.timestamp = System.currentTimeMillis();
 	}
-
 	
 	
 	/**
@@ -138,17 +92,24 @@ public class MapRepresentation implements Serializable {
 	 * @param id unique identifier of the node
 	 * @param mapAttribute attribute to process
 	 */
-	public synchronized void addNode(String id,MapAttribute mapAttribute){
-		Node n;
-		if (this.g.getNode(id)==null){
-			n=this.g.addNode(id);
-		}else{
-			n=this.g.getNode(id);
+	public synchronized boolean addNode(String nodeID, MapAttribute mapAttribute){
+	  Objects.requireNonNull(nodeID);
+	  Objects.requireNonNull(mapAttribute);
+	  
+		Node node;
+		var isNewNode = false;
+		if (graph.getNode(nodeID) == null) {
+      isNewNode = true;
+			node = graph.addNode(nodeID);
 		}
-		n.clearAttributes();
-		n.setAttribute("ui.class", mapAttribute.toString());
-		n.setAttribute("ui.label",id);
-		communicationTracker.addNewNodeToPending(id); // add for send the particle graph
+		else {
+			node = graph.getNode(nodeID);
+		}
+		nodes.put(nodeID, mapAttribute);
+		node.clearAttributes();
+		node.setAttribute("ui.class", mapAttribute.toString());
+		node.setAttribute("ui.label", nodeID);
+		return isNewNode;
 	}
 
 	/**
@@ -157,23 +118,28 @@ public class MapRepresentation implements Serializable {
 	 * @param id id of the node
 	 * @return true if added
 	 */
-	public synchronized boolean addNewNode(String id) {
-		if (this.g.getNode(id)==null){
-			addNode(id,MapAttribute.open);
+	public synchronized boolean addNewNode(String nodeID) {
+	  Objects.requireNonNull(nodeID);
+		if (graph.getNode(nodeID) == null) {
+			addNode(nodeID, MapAttribute.open);
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Add an undirect edge if not already existing.
+	 * Add an undirect edge if not alreasentProtocoldy existing.
 	 * @param idNode1 unique identifier of node1
 	 * @param idNode2 unique identifier of node2
 	 */
-	public synchronized void addEdge(String idNode1,String idNode2){
+	public synchronized String addEdge(String nodeID1, String nodeID2) {
+	  Objects.requireNonNull(nodeID1);
+	  Objects.requireNonNull(nodeID2);
 		this.nbEdges++;
 		try {
-			this.g.addEdge(this.nbEdges.toString(), idNode1, idNode2);
+			this.graph.addEdge(this.nbEdges.toString(), nodeID1, nodeID2);
+			edges.put(new UnorderedCouple<String>(nodeID1, nodeID2), nbEdges.toString());
+			return nbEdges.toString();
 		}catch (IdAlreadyInUseException e1) {
 			System.err.println("ID existing");
 			System.exit(1);
@@ -182,10 +148,7 @@ public class MapRepresentation implements Serializable {
 		} catch(ElementNotFoundException e3){
 
 		}
-	}
-	
-	public void addTresor(String idNode, Tresor tresorType) {
-		this.tresor.put(idNode, tresorType);
+		return null;
 	}
 
 	/**
@@ -200,10 +163,10 @@ public class MapRepresentation implements Serializable {
 		List<String> shortestPath=new ArrayList<String>();
 
 		Dijkstra dijkstra = new Dijkstra();//number of edge
-		dijkstra.init(g);
-		dijkstra.setSource(g.getNode(idFrom));
+		dijkstra.init(graph);
+		dijkstra.setSource(graph.getNode(idFrom));
 		dijkstra.compute();//compute the distance to all nodes from idFrom
-		List<Node> path=dijkstra.getPath(g.getNode(idTo)).getNodePath(); //the shortest path from idFrom to idTo
+		List<Node> path=dijkstra.getPath(graph.getNode(idTo)).getNodePath(); //the shortest path from idFrom to idTo
 		Iterator<Node> iter=path.iterator();
 		while (iter.hasNext()){
 			shortestPath.add(iter.next().getId());
@@ -233,15 +196,12 @@ public class MapRepresentation implements Serializable {
 		return getShortestPath(myPosition,closest.get().getLeft());
 	}
 
-
-
 	public List<String> getOpenNodes(){
-		return this.g.nodes()
+		return this.graph.nodes()
 				.filter(x ->x .getAttribute("ui.class")==MapAttribute.open.toString()) 
 				.map(Node::getId)
 				.collect(Collectors.toList());
 	}
-
 
 	/**
 	 * Before the migration we kill all non serializable components and store their data in a serializable form
@@ -251,7 +211,7 @@ public class MapRepresentation implements Serializable {
 
 		closeGui();
 
-		this.g=null;
+		this.graph = null;
 	}
 
 	/**
@@ -259,81 +219,23 @@ public class MapRepresentation implements Serializable {
 	 */
 	private synchronized void serializeGraphTopology() {
 		this.sg= new SerializableSimpleGraph<String,MapAttribute>();
-		Iterator<Node> iter=this.g.iterator();
+		Iterator<Node> iter=this.graph.iterator();
 		while(iter.hasNext()){
 			Node n=iter.next();
 			sg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
 		}
-		Iterator<Edge> iterE=this.g.edges().iterator();
+		Iterator<Edge> iterE=this.graph.edges().iterator();
 		while (iterE.hasNext()){
 			Edge e=iterE.next();
 			Node sn=e.getSourceNode();
 			Node tn=e.getTargetNode();
 			sg.addEdge(e.getId(), sn.getId(), tn.getId());
-		}	
-		
-		var a = g.nodes().map(Node::toString).collect(Collectors.joining("\n"));
-		System.out.println(a);
-	}
-	
-	
-	//version modified for generating the partical graph
-	private synchronized SerializableSimpleGraph<String,MapAttribute> serializeParticalGraphTopology(String agentId) {
-		SerializableSimpleGraph<String,MapAttribute> spg= new SerializableSimpleGraph<String,MapAttribute>();
-		
-		Set<String> unsentNodes = this.communicationTracker.getUnSentNodes(agentId);
-		
-		System.out.println("HashCode : " + System.identityHashCode(this.g));
-		if(unsentNodes.isEmpty())
-			return spg;
-		
-		for(String nodeId : unsentNodes) {
-			Node n = this.g.getNode(nodeId);
-			spg.addNode(n.getId(),MapAttribute.valueOf((String)n.getAttribute("ui.class")));
-			System.out.println(n.getId()+"node's class"+n.getAttribute("ui.class"));
 		}
-		System.out.println("to " + agentId + " : " + unsentNodes);
-		
-		Iterator<Edge> iterE=this.g.edges().iterator();
-		System.out.println("adding edges");
-		while (iterE.hasNext()){
-			Edge e=iterE.next();
-			Node sn=e.getSourceNode();
-			Node tn=e.getTargetNode();
-			if(unsentNodes.contains(sn.getId()) || unsentNodes.contains(tn.getId())) {
-				if(!unsentNodes.contains(sn)) {
-					spg.addNode(sn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
-					System.out.println(sn.getId()+"node's class"+sn.getAttribute("ui.class"));
-				}
-				
-				if(!unsentNodes.contains(tn)) {
-					spg.addNode(tn.getId(), MapAttribute.valueOf((String)tn.getAttribute("ui.class")));
-					System.out.println(tn.getId()+"node's class"+tn.getAttribute("ui.class"));
-				}
-				
-				spg.addEdge(e.getId(), sn.getId(), tn.getId());
-				System.out.print("edges : " + e.getId() );
-			}
-		}	
-		
-		return spg;
-	}
-
-
-	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId){
-		
-
-			 System.out.println("sending total graph to agent :"+ agentId); registerAgent(agentId);
-			 serializeGraphTopology(); return this.sg; 
-
-		 
-		
-		
 	}
 	
-	public DataShare getSerializedData(String agenntId) {
-		return new DataShare(this.getSerializableGraph(agenntId),
-				this.tresor);
+	public synchronized SerializableSimpleGraph<String,MapAttribute> getSerializableGraph(String agentId) {
+	  serializeGraphTopology();
+	  return this.sg;
 	}
 
 	/**
@@ -341,16 +243,16 @@ public class MapRepresentation implements Serializable {
 	 */
 	public synchronized void loadSavedData(){
 
-		this.g= new SingleGraph("My world vision");
-		this.g.setAttribute("ui.stylesheet",nodeStyle);
+		this.graph= new SingleGraph("My world vision");
+		this.graph.setAttribute("ui.stylesheet",nodeStyle);
 
 		openGui();
 
 		Integer nbEd=0;
 		for (SerializableNode<String, MapAttribute> n: this.sg.getAllNodes()){
-			this.g.addNode(n.getNodeId()).setAttribute("ui.class", n.getNodeContent().toString());
+			this.graph.addNode(n.getNodeId()).setAttribute("ui.class", n.getNodeContent().toString());
 			for(String s:this.sg.getEdges(n.getNodeId())){
-				this.g.addEdge(nbEd.toString(),n.getNodeId(),s);
+				this.graph.addEdge(nbEd.toString(),n.getNodeId(),s);
 				nbEd++;
 			}
 		}
@@ -378,12 +280,12 @@ public class MapRepresentation implements Serializable {
 	 * Method called after a migration to reopen GUI components
 	 */
 	private synchronized void openGui() {
-		this.viewer =new FxViewer(this.g, FxViewer.ThreadingModel.GRAPH_IN_ANOTHER_THREAD);//GRAPH_IN_GUI_THREAD)
+		this.viewer =new FxViewer(this.graph, FxViewer.ThreadingModel.GRAPH_IN_ANOTHER_THREAD);//GRAPH_IN_GUI_THREAD)
 		viewer.enableAutoLayout();
 		viewer.setCloseFramePolicy(FxViewer.CloseFramePolicy.CLOSE_VIEWER);
 		viewer.addDefaultView(true);
 
-		g.display();
+		graph.display();
 	}
 
 	public void mergeMap(SerializableSimpleGraph<String, MapAttribute> sgreceived) {
@@ -397,7 +299,7 @@ public class MapRepresentation implements Serializable {
 			Node newnode=null;
 			System.out.println("adding node : " + n.getNodeId());
 			try {
-				newnode=this.g.addNode(n.getNodeId());
+				newnode=this.graph.addNode(n.getNodeId());
 			}	catch(IdAlreadyInUseException e) {
 				alreadyIn=true;
 				//System.out.println("Already in"+n.getNodeId());
@@ -406,7 +308,7 @@ public class MapRepresentation implements Serializable {
 				newnode.setAttribute("ui.label", newnode.getId());
 				newnode.setAttribute("ui.class", n.getNodeContent().toString());
 			}else{
-				newnode=this.g.getNode(n.getNodeId());
+				newnode=this.graph.getNode(n.getNodeId());
 				//3 check its attribute. If it is below the one received, update it.
 				if (((String) newnode.getAttribute("ui.class"))==MapAttribute.closed.toString() || n.getNodeContent().toString()==MapAttribute.closed.toString()) {
 					System.out.println("modifiy node class to closed");
@@ -425,51 +327,144 @@ public class MapRepresentation implements Serializable {
 		}
 		//System.out.println("Merge done");
 	}
-	
-	public void addTresor(String nodeId, String tresorType) {
-		this.tresor.put(nodeId, new Tresor(tresorType));
-	}
-	
-	public void updateTresorData(String nodeId, boolean locked, boolean collected) {
-		
-	}
-	
-	public void mergeTresor(HashMap<String, Tresor> tresors) {
-		for(Map.Entry<String, Tresor> entry : tresors.entrySet()) {
-			this.tresor.put(entry.getKey(), entry.getValue());
-		}
-	}
-	
-	public void mergeAllData(DataShare ds) {
-		mergeMap(ds.getMap());
-		if(ds.isNewData(timestamp)) {
-			mergeTresor(ds.getTresors());
-		}
-	}
 
 	/**
 	 * 
 	 * @return true if there exist at least one openNode on the graph 
 	 */
 	public boolean hasOpenNode() {
-		return (this.g.nodes()
+		return (this.graph.nodes()
 				.filter(n -> n.getAttribute("ui.class")==MapAttribute.open.toString())
 				.findAny()).isPresent();
 	}
 	
 	
-	//new functions for communicationTracker
-	public synchronized void registerAgent(String agentId) {
-		this.communicationTracker.registerAgent(agentId);
+	
+	// Added methods.
+	public boolean containsNode(String nodeID) {
+	  Objects.requireNonNull(nodeID);
+	  return nodes.containsKey(nodeID);
 	}
 	
-	public synchronized void cleanSet(String agentId) {
-		this.communicationTracker.markNodesAsSent(agentId);
+	public boolean isOpenNode(String nodeID) {
+	  Objects.requireNonNull(nodeID);
+	  return nodes.get(nodeID).equals(MapAttribute.open);
 	}
 	
-
-	public long nbNodes() {
-	  return g.nodes().count();
+	public MapAttribute getNodeAttribute(String nodeID) {
+	  Objects.requireNonNull(nodeID);
+	  return nodes.get(nodeID);
 	}
-
+	
+	public String getEdgeIdentifier(UnorderedCouple<String> unorderedCouple) {
+	  Objects.requireNonNull(unorderedCouple);
+	  return edges.get(unorderedCouple);
+	}
+	
+	public String getEdgeIdentifier(String nodeID1, String nodeID2) {
+	  Objects.requireNonNull(nodeID1);
+	  Objects.requireNonNull(nodeID2);
+	  
+	  var unorderedCouple = new UnorderedCouple<String>(nodeID1, nodeID2);
+	  return edges.get(unorderedCouple);
+	}
+	
+	public List<String> getOpenNodeIdentifiers() {
+	  return graph.nodes()
+	      .filter(node -> isOpenNode(node.getId()))
+	      .map(Node::getId)
+	      .collect(Collectors.toList());
+	}
+	
+ 	public synchronized Optional<List<String>> getShortestPathFromCondidates(String currentPositionID,
+	                                                                         Collection<UnorderedCouple<String>> forbiddenEdges,
+	                                                                         Collection<String> condidates) {
+	  Objects.requireNonNull(currentPositionID);
+	  Objects.requireNonNull(forbiddenEdges);
+	  Objects.requireNonNull(condidates);
+	  
+	  var dijkstra = new Dijkstra();
+	  // We temporarily remove all forbidden edges in order to compute the shortest path.
+	  for (var edge: forbiddenEdges) {
+	    try {
+	      graph.removeEdge(getEdgeIdentifier(edge));
+	    } catch (ElementNotFoundException e) {
+        e.printStackTrace();
+        System.out.println(graph.edges().map(Edge::getId).toList());
+        System.out.println(edges);
+        System.out.println(forbiddenEdges);
+        System.out.println(edge);
+        System.exit(-1);
+      }
+	  }
+	  
+	  // Compute the shortest path.
+    dijkstra.init(graph);
+    dijkstra.setSource(graph.getNode(currentPositionID));
+    dijkstra.compute();
+    
+    // We add all deleted edges.
+    for (var edge: forbiddenEdges) {
+      graph.addEdge(getEdgeIdentifier(edge), edge.left(), edge.right());
+    }
+    
+    var bestCondidate = condidates.stream()
+        .min(Comparator.comparingDouble(nodeID -> dijkstra.getPathLength(graph.getNode(nodeID))));
+    
+    if (bestCondidate.isPresent()) {
+      var shortestPath = new ArrayList<String>();
+      for (var node: dijkstra.getPath(graph.getNode(bestCondidate.get())).getNodePath()) {
+        shortestPath.add(node.getId());
+      }
+      if (!shortestPath.isEmpty()) {
+        dijkstra.clear();
+        shortestPath.removeFirst();
+        return Optional.of(shortestPath);
+      }
+    }
+    dijkstra.clear();
+    return Optional.empty();
+	}
+  
+  public synchronized SerializableSimpleGraph<String, MapAttribute> getSerializedParticalGraphTopology(Set<String> targetNodes) {
+    Objects.requireNonNull(targetNodes);
+    
+    var serializedParticalGraph = new SerializableSimpleGraph<String, MapAttribute>();
+    for (var nodeID: targetNodes) {
+      //System.out.println(nodeID);
+      serializedParticalGraph.addNode(nodeID, getNodeAttribute(nodeID));
+    }
+    //System.out.println(targetNodes);
+    var edgesIterator = graph.edges().iterator();
+    while (edgesIterator.hasNext()) {
+      var edge = edgesIterator.next();
+      var srcNode = edge.getSourceNode();
+      var tarNode = edge.getTargetNode();
+      
+      var srcNodeID = srcNode.getId();
+      var tarNodeID = tarNode.getId();
+      if (targetNodes.contains(srcNodeID) || targetNodes.contains(tarNodeID)) {
+        if (!targetNodes.contains(srcNodeID)) {
+          serializedParticalGraph.addNode(srcNodeID, getNodeAttribute(srcNodeID));
+        }
+        if (!targetNodes.contains(tarNodeID)) {
+          serializedParticalGraph.addNode(tarNodeID, getNodeAttribute(tarNodeID));
+        }
+        //System.out.println(edge.getId() + " " + srcNodeID + " " + tarNodeID);
+        serializedParticalGraph.addEdge(edge.getId(), srcNodeID, tarNodeID);
+      }
+    }
+    return serializedParticalGraph;
+  }
+  
+  public List<UnorderedCouple<String>> getAllEdges() {
+    return edges.keySet().stream()
+        .collect(Collectors.toList());
+  }
+  
+  public List<String> getAllNodes() {
+    return nodes.keySet().stream()
+        .toList();
+  }
 }
+

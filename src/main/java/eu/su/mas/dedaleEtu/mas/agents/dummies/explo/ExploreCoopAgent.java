@@ -10,17 +10,19 @@ import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedale.mas.agent.behaviours.platformManagment.*;
 
 import eu.su.mas.dedaleEtu.mas.behaviours.ExploCoopBehaviour;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.Broadcast;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.EndExplore;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.Explore;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.MergeMap;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareMap;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsm.ShareReceiveManagement;
-import eu.su.mas.dedaleEtu.mas.knowledge.DataShare;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.BroadcastBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.EndBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.ExploreBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.RandomTerminationBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.TerminationInformBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.CollectBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.EmptyPackBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.ShareReceiveBehaviour;
+import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.SolveDeadlockBehaviour;
+import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation;
 import eu.su.mas.dedaleEtu.mas.knowledge.MapRepresentation.MapAttribute;
-import eu.su.mas.dedaleEtu.mas.utils.MapContainer;
-import eu.su.mas.dedaleEtu.mas.utils.WaitingList;
+import eu.su.mas.dedaleEtu.mas.utils.WaitingProtocolsList;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.FSMBehaviour;
 
@@ -66,7 +68,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
 		//get the parameters added to the agent at creation (if any)
 		final Object[] args = getArguments();
 		
-		List<String> list_agentNames=new ArrayList<String>();
+		List<String> listAgentNames=new ArrayList<String>();
 		
 		if(args.length==0){
 			System.err.println("Error while creating the agent, names of agent to contact expected");
@@ -74,7 +76,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
 		}else{
 			int i=2;// WARNING YOU SHOULD ALWAYS START AT 2. This will be corrected in the next release.
 			while (i<args.length) {
-				list_agentNames.add((String)args[i]);
+				listAgentNames.add((String)args[i]);
 				i++;
 			}
 		}
@@ -89,26 +91,73 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
 		
 		// lb.add(new ExploCoopBehaviour(this,this.myMap,list_agentNames));
     var fsm = new FSMBehaviour();
-    var mapContainer = new MapContainer();
-    var waitingList = new WaitingList();
-    var receivedTopos = new HashMap<String, DataShare>();
-    var shareWith = new ArrayList<String>();
     
-    fsm.registerFirstState(new Explore(this, mapContainer), "EXPLORE");
-    fsm.registerState(new Broadcast(this, list_agentNames, waitingList), "BROADCAST");
-    fsm.registerState(new ShareReceiveManagement(this, waitingList, receivedTopos, shareWith, mapContainer), "SHARE-RECEIVE-MANAGEMENT");
-    fsm.registerState(new ShareMap(this, mapContainer, shareWith), "SHARE");
-    fsm.registerState(new MergeMap(this, mapContainer, receivedTopos), "MERGE");
-    fsm.registerLastState(new EndExplore(this), "END-EXPLORE");
+    var agentKnowledge = new AgentKnowledge(this, listAgentNames, false);
+    
+    fsm.registerFirstState(new ExploreBehaviour(this, agentKnowledge), "EXPLORE");
+    fsm.registerState(new BroadcastBehaviour(this, agentKnowledge), "BROADCAST");
+    fsm.registerState(new ShareReceiveBehaviour(this, agentKnowledge), "SHARE-RECEIVE-MANAGEMENT");
+    //fsm.registerState(new ShareReceiveBehaviour(this, waitingList, receivedTopos, shareWith, mapContainer), "SHARE-RECEIVE-MANAGEMENT");
+    //fsm.registerState(new ShareMap(this, mapContainer, shareWith), "SHARE");
+    fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK");
+    fsm.registerLastState(new EndBehaviour(this, agentKnowledge), "END-EXPLORE");
+    
+    fsm.registerState(new CollectBehaviour(this, agentKnowledge), "RT");
+    fsm.registerState(new BroadcastBehaviour(this, agentKnowledge), "BROADCAST2");
+    fsm.registerState(new ShareReceiveBehaviour(this, agentKnowledge), "SHARE-RECEIVE-MANAGEMENT2");
+    fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK2");
+    
+    fsm.registerState(new EmptyPackBehaviour(this, agentKnowledge), "T");
+    fsm.registerState(new BroadcastBehaviour(this, agentKnowledge), "BROADCAST3");
+    fsm.registerState(new ShareReceiveBehaviour(this, agentKnowledge), "SHARE-RECEIVE-MANAGEMENT3");
+    fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK3");
+    
+    
+    fsm.registerState(new TerminationInformBehaviour(this, agentKnowledge), "A");
+    
+    fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK5");
+    fsm.registerState(new RandomTerminationBehaviour(this, agentKnowledge), "RTB");
+    fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK4");
+    
     
     fsm.registerTransition("EXPLORE", "BROADCAST", 1);
-    fsm.registerTransition("EXPLORE", "END-EXPLORE", 0);
+    fsm.registerTransition("EXPLORE", "RT", 0);
+    fsm.registerTransition("EXPLORE", "SOLVE-DEADLOCK", 2);
     fsm.registerDefaultTransition("BROADCAST", "SHARE-RECEIVE-MANAGEMENT");
-    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "EXPLORE", 0);
-    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "SHARE", 1);
-    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "MERGE", 2);
-    fsm.registerDefaultTransition("SHARE", "SHARE-RECEIVE-MANAGEMENT");
-    fsm.registerDefaultTransition("MERGE", "SHARE-RECEIVE-MANAGEMENT");
+    
+    fsm.registerTransition("RT", "BROADCAST2", 1);
+    fsm.registerTransition("RT", "T", 0);
+    fsm.registerTransition("RT", "SOLVE-DEADLOCK2", 2);
+    fsm.registerTransition("RT", "A", 3);
+    fsm.registerDefaultTransition("BROADCAST2", "SHARE-RECEIVE-MANAGEMENT2");
+    fsm.registerDefaultTransition("SHARE-RECEIVE-MANAGEMENT2", "RT");
+    fsm.registerDefaultTransition("SOLVE-DEADLOCK2", "BROADCAST2");
+    //fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "EXPLORE", 0);
+    //fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "SHARE", 1);
+    //fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "MERGE", 2);
+    fsm.registerDefaultTransition("SHARE-RECEIVE-MANAGEMENT", "EXPLORE");
+    fsm.registerDefaultTransition("SOLVE-DEADLOCK", "BROADCAST");
+    //fsm.registerDefaultTransition("SHARE", "SHARE-RECEIVE-MANAGEMENT");
+    //fsm.registerDefaultTransition("MERGE", "SHARE-RECEIVE-MANAGEMENT");
+    
+    fsm.registerTransition("T", "BROADCAST3", 1);
+    fsm.registerTransition("T", "BROADCAST2", 0);
+    fsm.registerTransition("T", "SOLVE-DEADLOCK3", 2);
+    fsm.registerDefaultTransition("BROADCAST3", "SHARE-RECEIVE-MANAGEMENT3");
+    fsm.registerDefaultTransition("SHARE-RECEIVE-MANAGEMENT3", "T");
+    fsm.registerDefaultTransition("SOLVE-DEADLOCK3", "BROADCAST3");
+    
+    
+
+    fsm.registerTransition("A", "A", 1);
+    fsm.registerTransition("A", "RTB", 0);
+    fsm.registerTransition("A", "SOLVE-DEADLOCK5", 2);
+    fsm.registerDefaultTransition("SOLVE-DEADLOCK5", "A");
+    
+    fsm.registerTransition("RTB", "END-EXPLORE", 0);
+    fsm.registerTransition("RTB", "RTB", 1);
+    fsm.registerTransition("RTB", "SOLVE-DEADLOCK4", 2);
+    fsm.registerDefaultTransition("SOLVE-DEADLOCK4", "RTB");
     
     lb.add(fsm);
 

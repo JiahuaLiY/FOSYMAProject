@@ -71,7 +71,7 @@ public class ShareMapBehaviour extends TickerBehaviour{
 	        
 	        
 	        ((AbstractDedaleAgent) this.myAgent).sendMessage(msg);
-	        this.myMap.cleanSet(agentName);
+	        //this.myMap.cleanSet(agentName);
 	    }
 		
 		System.out.println("end of send");
