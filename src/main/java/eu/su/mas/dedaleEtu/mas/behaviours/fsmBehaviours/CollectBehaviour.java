@@ -89,7 +89,7 @@ public final class CollectBehaviour extends OneShotBehaviour {
           agentKnowledge.setAttemptPositionID(null);
         }
         else if (agentKnowledge.isTreasureCollectionTaskCompleted()) {
-          agentKnowledge.print();
+          agentKnowledge.showAgentKnowledge();
           agentKnowledge.setAttemptPositionID(null);
           agentKnowledge.resetShortestPath();
           nextStateTransition = 4; // Go to termination inform phase.
@@ -100,8 +100,8 @@ public final class CollectBehaviour extends OneShotBehaviour {
           nextStateTransition = 2; // Go to solve deadlock phase.
         }
         else {
-          System.out.println("yes");
-          agentKnowledge.print();
+          System.out.println(agent.getLocalName() + " go to random search");
+          agentKnowledge.showAgentKnowledge();
           agentKnowledge.setAttemptPositionID(null);
           agentKnowledge.resetShortestPath();
           nextStateTransition = 3;

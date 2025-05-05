@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedale.mas.agent.behaviours.platformManagment.StartMyBehaviours;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.BroadcastBehaviour;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.CollectBehaviour;
-import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.EmptyPackBehaviour;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.EndBehaviour;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.ExploreBehaviour;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.RandomSearchBehaviour;
@@ -19,9 +17,9 @@ import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge.AgentType;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.FSMBehaviour;
 
-public final class CollectAgent extends AbstractDedaleAgent {
+public final class ExploreAgent extends AbstractDedaleAgent {
 
-  private static final long serialVersionUID = -1035914898055041386L;
+  private static final long serialVersionUID = 1585931133019386794L;
 
   protected void setup() {
     super.setup();
@@ -38,38 +36,26 @@ public final class CollectAgent extends AbstractDedaleAgent {
     
     var behaviours = new ArrayList<Behaviour>();
     var fsm = new FSMBehaviour();
-    var agentKnowledge = new AgentKnowledge(this, agentIdentifiers, AgentType.COLLECT_AGENT);
+    var agentKnowledge = new AgentKnowledge(this, agentIdentifiers, AgentType.EXPLORE_AGENT);
     
     fsm.registerFirstState(new ExploreBehaviour(this, agentKnowledge), "MAP-EXPLORE");
     fsm.registerState(new BroadcastBehaviour(this, agentKnowledge), "BROADCAST");
     fsm.registerState(new ShareReceiveBehaviour(this, agentKnowledge), "SHARE-RECEIVE-MANAGEMENT");
     fsm.registerState(new SolveDeadlockBehaviour(this, agentKnowledge), "SOLVE-DEADLOCK");
     
-    fsm.registerState(new CollectBehaviour(this, agentKnowledge), "TREASURE-COLLECT");
-    fsm.registerState(new EmptyPackBehaviour(this, agentKnowledge), "EMPTY-PACK");
     fsm.registerState(new TerminationInformBehaviour(this, agentKnowledge), "TERMINATION-INFORM");
     fsm.registerState(new RandomTerminationBehaviour(this, agentKnowledge), "RANDOM-TERMINATION");
     fsm.registerState(new RandomSearchBehaviour(this, agentKnowledge), "RANDOM-SEARCH");
     
     fsm.registerLastState(new EndBehaviour(this, agentKnowledge), "END");
 
-    fsm.registerTransition("MAP-EXPLORE", "TREASURE-COLLECT", 0);
+    fsm.registerTransition("MAP-EXPLORE", "RANDOM-SEARCH", 0);
     fsm.registerTransition("MAP-EXPLORE", "BROADCAST", 1);
     fsm.registerTransition("MAP-EXPLORE", "SOLVE-DEADLOCK", 2);
     
-    fsm.registerTransition("TREASURE-COLLECT", "EMPTY-PACK", 0);
-    fsm.registerTransition("TREASURE-COLLECT", "BROADCAST", 1);
-    fsm.registerTransition("TREASURE-COLLECT", "SOLVE-DEADLOCK", 2);
-    fsm.registerTransition("TREASURE-COLLECT", "RANDOM-SEARCH", 3);
-    fsm.registerTransition("TREASURE-COLLECT", "TERMINATION-INFORM", 4);
-    
-    fsm.registerTransition("RANDOM-SEARCH", "TREASURE-COLLECT", 0);
+    fsm.registerTransition("RANDOM-SEARCH", "TERMINATION-INFORM", 0);
     fsm.registerTransition("RANDOM-SEARCH", "BROADCAST", 1);
     fsm.registerTransition("RANDOM-SEARCH", "SOLVE-DEADLOCK", 2);
-    
-    fsm.registerTransition("EMPTY-PACK", "TREASURE-COLLECT", 0);
-    fsm.registerTransition("EMPTY-PACK", "BROADCAST", 1);
-    fsm.registerTransition("EMPTY-PACK", "SOLVE-DEADLOCK", 2);
     
     //fsm.registerTransition("TERMINATION-INFORM", "RANDOM-TERMINATION", 0);
     fsm.registerTransition("TERMINATION-INFORM", "BROADCAST", 1);
@@ -83,8 +69,8 @@ public final class CollectAgent extends AbstractDedaleAgent {
     fsm.registerDefaultTransition("BROADCAST", "SHARE-RECEIVE-MANAGEMENT");
     
     fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "MAP-EXPLORE", 1);
-    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "TREASURE-COLLECT", 2);
-    fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "EMPTY-PACK", 3);
+    //fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "TREASURE-COLLECT", 2);
+    //fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "EMPTY-PACK", 3);
     fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "RANDOM-SEARCH", 4);
     fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "TERMINATION-INFORM", 5);
     fsm.registerTransition("SHARE-RECEIVE-MANAGEMENT", "RANDOM-TERMINATION", 6);
@@ -106,3 +92,4 @@ public final class CollectAgent extends AbstractDedaleAgent {
     super.afterMove();
   }
 }
+

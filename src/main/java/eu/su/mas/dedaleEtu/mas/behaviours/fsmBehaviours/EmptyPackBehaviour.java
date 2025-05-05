@@ -1,8 +1,11 @@
 package eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours;
 
+import java.util.List;
 import java.util.Objects;
 
 import dataStructures.tuple.Couple;
+import eu.su.mas.dedale.env.Location;
+import eu.su.mas.dedale.env.Observation;
 import eu.su.mas.dedale.env.gs.GsLocation;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge;
@@ -46,18 +49,25 @@ public final class EmptyPackBehaviour extends OneShotBehaviour {
       agentKnowledge.resetShortestPath();
       
       //System.out.println(currentPosition);
-      System.out.println(agentKnowledge.getTankerAgentName());
+      
+      var tankerAgentName = getTankerAgentNameToEmptyPack(currentPosition, observations);
+      System.out.println(tankerAgentName);
       System.out.println(System.currentTimeMillis());
       
-      if (agent.emptyMyBackPack(agentKnowledge.getTankerAgentName())) {
+      if (agent.emptyMyBackPack(tankerAgentName)) {
         System.err.println(agent.getLocalName() + " " + agentKnowledge.currentPackCapacity() + " " + agentKnowledge.initialPackCapacity());
+        /*
         if (!agentKnowledge.isPackFree()) {
           nextStateTransition = 1;
         }
         else {
           nextStateTransition = 0;
           agentKnowledge.setAgentMode(AgentMode.TREASURE_COLLECT);
+        }*/
+        if (agentKnowledge.isPackFree()) {
+          agentKnowledge.setAgentMode(AgentMode.TREASURE_COLLECT);
         }
+        nextStateTransition = 1;
       }
       else {
         nextStateTransition = 1;
@@ -86,6 +96,27 @@ public final class EmptyPackBehaviour extends OneShotBehaviour {
       }
       agent.moveTo(new GsLocation(nextPositionID.get()));
     }
+  }
+  
+  private String getTankerAgentNameToEmptyPack(Location currentPosition,
+                                               List<Couple<Location, List<Couple<Observation, String>>>> observations) {
+    for (var couple: observations) {
+      if (couple.getLeft().equals(currentPosition)) {
+        continue;
+      }
+      for (var observation: couple.getRight()) {
+        switch (observation.getLeft()) {
+          case AGENTNAME:
+            if (!agentKnowledge.isTankerAgentID(observation.getRight())) {
+              break;
+            }
+            return observation.getRight();
+          default:
+            break;
+        }
+      }
+    }
+    return null;
   }
   
   @Override

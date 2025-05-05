@@ -42,7 +42,17 @@ public final class RandomSearchBehaviour extends OneShotBehaviour {
     agentKnowledge.updateAgentKnowledge(currentPosition, observations);
     //System.out.println(currentPosition + " " + agentKnowledge.mode() + " " + agentKnowledge.destinationPositionID());
     //System.out.println("nonnon");
-    if (agentKnowledge.isTreasureCollectionTaskCompleted() || !agentKnowledge.pickableTreasurePositions().isEmpty()) {
+    if (agentKnowledge.isTreasureCollectionTaskCompleted()) {
+      agentKnowledge.cleanRandomSelectedPositions();
+      
+      agentKnowledge.setAttemptPositionID(null);
+      agentKnowledge.resetShortestPath();
+      nextStateTransition = 0; // Go to termination inform phase.
+      agentKnowledge.setAgentMode(AgentMode.TERMINATION_INFORM);
+      return;
+    }
+    
+    if (!agentKnowledge.pickableTreasurePositions().isEmpty()) {
       agentKnowledge.cleanRandomSelectedPositions();
       
       agentKnowledge.setAttemptPositionID(null);

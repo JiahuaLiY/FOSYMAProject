@@ -37,14 +37,14 @@ public class ShareReceiveBehaviour extends OneShotBehaviour {
   
   @Override
   public void action() {
+    if (agentKnowledge.isTankerAgent()) {
+      processAgentTermination();
+    }
     processExploreBroadcast();
     processExploreBroadcastAck();
     processDataShare();
     processDataShareAck();
-    if (agentKnowledge.isTankerAgent()) {
-      processAgentTermination();
-    }
-    
+
     var waitingList = agentKnowledge.waitingProtocolsList();
     
     if (!waitingList.allCompleted()) {

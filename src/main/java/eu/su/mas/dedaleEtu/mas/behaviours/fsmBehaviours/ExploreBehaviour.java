@@ -6,6 +6,7 @@ import eu.su.mas.dedale.env.gs.GsLocation;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge;
 import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge.AgentMode;
+import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge.AgentType;
 import jade.core.behaviours.OneShotBehaviour;
 
 public class ExploreBehaviour extends OneShotBehaviour {
@@ -51,10 +52,17 @@ public class ExploreBehaviour extends OneShotBehaviour {
         if (!agentKnowledge.map().hasOpenNode()) {
           agentKnowledge.setAttemptPositionID(null);
           agentKnowledge.resetShortestPath();
-          nextStateTransition = 0; // Go to collect phase.
-          agentKnowledge.setAgentMode(AgentMode.TREASURE_COLLECT);
+          nextStateTransition = 0; // Go to collect or random search phase.
           agentKnowledge.computeTreasureNumberRegister();
-          agentKnowledge.print();
+          agentKnowledge.initializeTerminationInformAcks();
+          
+          if (agentKnowledge.agentType().equals(AgentType.COLLECT_AGENT)) {
+            agentKnowledge.setAgentMode(AgentMode.TREASURE_COLLECT);
+          }
+          else {
+            agentKnowledge.setAgentMode(AgentMode.RANDOM_SEARCH);
+          }
+          agentKnowledge.showAgentKnowledge();
         }
         else {
           nextStateTransition = 2;

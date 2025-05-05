@@ -19,7 +19,7 @@ public final class DataContainer implements Serializable {
   
   private final Map<String, Treasure> treasures;
   
-  private final Couple<String, Couple<String, List<String>>> tankerAgentKnowledge;
+  private final Map<String, Couple<String, List<String>>> tankerAgentKnowledges;
   
   private final Map<String, Map<Observation, Integer>> treasureCollectionKnowledge;
   
@@ -27,12 +27,12 @@ public final class DataContainer implements Serializable {
   
   public DataContainer(SerializableSimpleGraph<String, MapAttribute> graph,
                        Map<String, Treasure> treasures,
-                       Couple<String, Couple<String, List<String>>> tankerAgentKnowledge,
+                       Map<String, Couple<String, List<String>>> tankerAgentKnowledges,
                        Map<String, Map<Observation, Integer>> treasureCollectionKnowledge,
                        Map<String, Observation> agentPreferences) {
     this.graph = graph;
     this.treasures = treasures;
-    this.tankerAgentKnowledge = tankerAgentKnowledge;
+    this.tankerAgentKnowledges = tankerAgentKnowledges;
     this.treasureCollectionKnowledge = treasureCollectionKnowledge;
     this.agentPreferences = agentPreferences;
   }
@@ -45,8 +45,8 @@ public final class DataContainer implements Serializable {
     return treasures != null ? Optional.of(treasures) : Optional.empty();
   }
   
-  public Optional<Couple<String, Couple<String, List<String>>>> tankerAgentKnowledge() {
-    return tankerAgentKnowledge != null ? Optional.of(tankerAgentKnowledge) : Optional.empty();
+  public Optional<Map<String, Couple<String, List<String>>>> tankerAgentKnowledges() {
+    return tankerAgentKnowledges != null ? Optional.of(tankerAgentKnowledges) : Optional.empty();
   }
   
   public Optional<Map<String, Map<Observation, Integer>>> treasureCollectionKnowledge() {

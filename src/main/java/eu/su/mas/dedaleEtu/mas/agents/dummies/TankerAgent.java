@@ -9,6 +9,7 @@ import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.EndBehaviour;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.ShareReceiveBehaviour;
 import eu.su.mas.dedaleEtu.mas.behaviours.fsmBehaviours.TankerAgentBahaviour;
 import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge;
+import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge.AgentType;
 import jade.core.behaviours.Behaviour;
 import jade.core.behaviours.FSMBehaviour;
 
@@ -31,7 +32,7 @@ public final class TankerAgent extends AbstractDedaleAgent {
     
     var behaviours = new ArrayList<Behaviour>();
     var fsm = new FSMBehaviour();
-    var agentKnowledge = new AgentKnowledge(this, agentIdentifiers, true);
+    var agentKnowledge = new AgentKnowledge(this, agentIdentifiers, AgentType.TANKER_AGENT);
     
     fsm.registerFirstState(new TankerAgentBahaviour(this, agentKnowledge), "TANKER");
     fsm.registerState(new BroadcastBehaviour(this, agentKnowledge), "BROADCAST");

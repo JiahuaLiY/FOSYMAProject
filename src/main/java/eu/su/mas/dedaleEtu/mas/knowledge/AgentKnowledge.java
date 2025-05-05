@@ -39,6 +39,10 @@ public final class AgentKnowledge implements Serializable {
     TERMINATION_INFORM
   }
   
+  public enum AgentType {
+    TANKER_AGENT, COLLECT_AGENT, EXPLORE_AGENT
+  }
+  
   private static final long serialVersionUID = -5688359185607177514L;
 
   public static final long MOVEMENT_WAITING_DURATION = 1000;
@@ -57,7 +61,9 @@ public final class AgentKnowledge implements Serializable {
   
   private final Set<String> agentIdentifiers;
   
-  private final boolean isTankerAgent;
+  //private final boolean isTankerAgent;
+  
+  private final AgentType agentType;
   
   private MapRepresentation map;
   
@@ -67,7 +73,9 @@ public final class AgentKnowledge implements Serializable {
   
   private final WaitingProtocolsList waitingProtocolsList;
   
-  private Couple<String, Couple<String, List<String>>> tankerAgentKnowledge;
+  //private Couple<String, Couple<String, List<String>>> tankerAgentKnowledge;
+  
+  private final Map<String, Couple<String, List<String>>> tankerAgentKnowledges;
   
   private Map<String, Map<Observation, Integer>> treasureCollectionKnowledge;
   
@@ -91,15 +99,18 @@ public final class AgentKnowledge implements Serializable {
   
   private final int initialPackCapacity;
   
+  private final Map<String, Boolean> terminationInformAcks;
+  
   public AgentKnowledge(AbstractDedaleAgent agent,
                         Collection<String> agentIdentifiers,
-                        boolean isTankerAgent) {
+                        AgentType agentType) {
     Objects.requireNonNull(agent);
     Objects.requireNonNull(agentIdentifiers);
     
     this.agent = agent;
     this.agentIdentifiers = Set.copyOf(agentIdentifiers);
-    this.isTankerAgent = isTankerAgent;
+    //this.isTankerAgent = isTankerAgent;
+    this.agentType = agentType;
     
     this.treasures = new HashMap<>();
     this.dataShareTracker = new DataShareTracker(agentIdentifiers);
@@ -115,28 +126,33 @@ public final class AgentKnowledge implements Serializable {
     this.agentPreferences.put(agent.getLocalName(), agent.getMyTreasureType());
     dataShareTracker.setAgentPreferencesSendingStatus(false);
     
-    this.mode = isTankerAgent ? AgentMode.IMMOBILE : AgentMode.MAP_EXPLORE;
+    //this.mode = isTankerAgent ? AgentMode.IMMOBILE : AgentMode.MAP_EXPLORE;
+    this.mode = isTankerAgent() ? AgentMode.IMMOBILE : AgentMode.MAP_EXPLORE;
     
-    if (isTankerAgent) {
+    if (isTankerAgent()) {
       this.agentTerminationsRegister = agentIdentifiers.stream()
           .collect(Collectors.toMap(Function.identity(), agentID -> false));
+      this.terminationInformAcks = null;
     }
     else {
       this.agentTerminationsRegister = null;
+      this.terminationInformAcks = new HashMap<>();
     }
     
-    if (!isTankerAgent) {
+    if (isCollectAgent()) {
       this.initialPackCapacity = currentPackCapacity();
     }
     else {
       this.initialPackCapacity = 0;
     }
+    
+    this.tankerAgentKnowledges = new HashMap<>();
   }
   
   private void validateAgentIdentifier(String agentID) {
     Objects.requireNonNull(agentID);
     if (!agentIdentifiers.contains(agentID)) {
-      throw new IllegalArgumentException("Unknow agent identifier: " + agentID);
+      throw new IllegalArgumentException("Unknown agent identifier: " + agentID);
     }
   }
   
@@ -177,6 +193,8 @@ public final class AgentKnowledge implements Serializable {
           treasure.setTreasureLocked(!Boolean.valueOf(couple.getRight()));
           break;
           
+        case STENCH:
+          break;
         default:
           throw new IllegalArgumentException("Unsupported kind: " + couple.getLeft());
       }
@@ -244,10 +262,19 @@ public final class AgentKnowledge implements Serializable {
   public Set<UnorderedCouple<String>> getForbiddenEdgesForShortestPath(List<Couple<Location, List<Couple<Observation, String>>>> observations) {
     var forbiddenEdges = new HashSet<UnorderedCouple<String>>();
     if (knowsTankerAgent()) {
-      var tankerAgentPositionID = tankerAgentKnowledge.getRight().getLeft();
-      forbiddenEdges.addAll(tankerAgentKnowledge.getRight().getRight().stream()
+      /*
+      var tankerAgentPositionID = tankerAgentKnowledges.get("Tom").getLeft();
+      forbiddenEdges.addAll(tankerAgentKnowledges.get("Tom").getRight().stream()
           .map(e -> new UnorderedCouple<>(tankerAgentPositionID, e))
-          .toList());
+          .toList());*/
+      
+      for (var entry: tankerAgentKnowledges.entrySet()) {
+        var tankerAgentKnowledge = entry.getValue();
+        var tankerAgentPositionID = tankerAgentKnowledge.getLeft();
+        forbiddenEdges.addAll(tankerAgentKnowledge.getRight().stream()
+            .map(e -> new UnorderedCouple<>(tankerAgentPositionID, e))
+            .toList());
+      }
     }
     for (var couple: observations) {
       var nodeID = couple.getLeft().getLocationId();
@@ -305,22 +332,48 @@ public final class AgentKnowledge implements Serializable {
         break;
         
       case EMPTY_PACKAGE:
+        if (!knowsTankerAgent()) {
+          throw new IllegalStateException("Agent " + agent.getLocalName() + " is not aware of the existence of the tanker agent");
+        }
+        candidates = tankerAgentKnowledges.values().stream()
+            .flatMap(v -> v.getRight().stream()
+                .map(Function.identity()))
+            .toList();
+        break;
+        
       case TERMINATION_INFORM:
         if (!knowsTankerAgent()) {
           throw new IllegalStateException("Agent " + agent.getLocalName() + " is not aware of the existence of the tanker agent");
         }
-        candidates = tankerAgentKnowledge.getRight().getRight();
+        candidates = tankerAgentKnowledges.entrySet().stream()
+            .filter(e -> !terminationInformAcks.get(e.getKey()))
+            .flatMap(e -> e.getValue().getRight().stream()
+                .map(Function.identity()))
+            .toList();
+        System.err.println(candidates);
         break;
         
       case RANDOM_SEARCH:
         if (randomSelectedPositions == null || randomSelectedPositions.isEmpty()) {
           var sources = map().getAllNodes();
-          this.randomSelectedPositions = getKRandomElements(map().getAllNodes(),
-                                                            Math.min(sources.size() - 2, 5));
-         randomSelectedPositions.remove(tankerAgentKnowledge.getRight().getLeft());
+          var randomSelectedPositions = getKRandomElements(map().getAllNodes(),
+                                                           Math.min(sources.size() - 2, 5));
+          
+          var rg = new Random();
+          for (var tankerAgentKnowledge: tankerAgentKnowledges.values()) {
+            var tankerAgentPositionID = tankerAgentKnowledge.getLeft();
+            var adjacentPositions = tankerAgentKnowledge.getRight();
+            
+            randomSelectedPositions.remove(tankerAgentPositionID);
+            var idx = rg.nextInt(adjacentPositions.size());
+            randomSelectedPositions.add(adjacentPositions.get(idx));
+          }
+          this.randomSelectedPositions = randomSelectedPositions;
+          /*
+         randomSelectedPositions.remove(tankerAgentKnowledges.get("Tom").getLeft());
          var rg = new Random();
-         var idx = rg.nextInt(tankerAgentKnowledge.getRight().getRight().size());
-         randomSelectedPositions.add(tankerAgentKnowledge.getRight().getRight().get(idx));
+         var idx = rg.nextInt(tankerAgentKnowledges.get("Tom").getRight().size());
+         randomSelectedPositions.add(tankerAgentKnowledges.get("Tom").getRight().get(idx));*/
         }
         candidates = randomSelectedPositions;
         System.out.println(agent.getLocalName() + " " + candidates + " " + mode);
@@ -377,11 +430,7 @@ public final class AgentKnowledge implements Serializable {
   public boolean reachDestination() {
     return destinationPositionID != null && currentPositionID.equals(destinationPositionID);
   }
-  
-  
-  
-  
-  
+   
   private SerializableSimpleGraph<String, MapAttribute> cloneGraph(String agentID) {
     var graphNodes = dataShareTracker.getGraphNodes(agentID);
     if (graphNodes.isEmpty()) {
@@ -389,7 +438,6 @@ public final class AgentKnowledge implements Serializable {
     }
     return map().getSerializedParticalGraphTopology(graphNodes);
   }
-  
   
   private Map<String, Treasure> cloneTreasures(String agentID) {
     var treasureNodes = dataShareTracker.getTreasureNodes(agentID);
@@ -400,6 +448,7 @@ public final class AgentKnowledge implements Serializable {
     return Map.copyOf(treasures);
   }
 
+  /*
   private Couple<String, Couple<String, List<String>>> cloneTankerAgentKnowledge(String agentID) {
     if (!knowsTankerAgent() 
         || dataShareTracker.getTankerAgentKnowledgeSendingStatus(agentID)) {
@@ -408,6 +457,21 @@ public final class AgentKnowledge implements Serializable {
     return new Couple<>(tankerAgentKnowledge.getLeft(),
                         new Couple<>(tankerAgentKnowledge.getRight().getLeft(),
                                      List.copyOf(tankerAgentKnowledge.getRight().getRight())));
+  }*/
+  
+  private Map<String, Couple<String, List<String>>> cloneTankerAgentKnowledges(String agentID) {
+    if (!knowsTankerAgent() || dataShareTracker.getTankerAgentKnowledgeSendingStatus(agentID)) {
+      return null;
+    }
+    var tankerAgentKnowledges = new HashMap<String, Couple<String, List<String>>>();
+    for (var entry: this.tankerAgentKnowledges.entrySet()) {
+      var tankerAgentName = entry.getKey();
+      var tankerAgentKnowledge = entry.getValue();
+      tankerAgentKnowledges.put(tankerAgentName,
+                                new Couple<>(tankerAgentKnowledge.getLeft(),
+                                             List.copyOf(tankerAgentKnowledge.getRight())));
+    }
+    return tankerAgentKnowledges;
   }
   
   private Map<String, Map<Observation, Integer>> cloneTreasureCollectionKnowledge(String agentID) {
@@ -431,41 +495,12 @@ public final class AgentKnowledge implements Serializable {
   }
   
   public DataContainer getDataToBeSent(String agentID) {
+    //System.out.println(agentID);
     validateAgentIdentifier(agentID);
-    /*
-    if (!dataShareTracker.sendingRequired(agentID)) {
-      return Optional.empty();
-    }*/
-    /*
-    DataContainer dataContainer = null;
-    switch (mode) {
-      case IMMOBILE:
-        dataContainer = new DataContainer(cloneGraph(agentID),
-                                          cloneTreasures(agentID),
-                                          cloneTankerAgentKnowledge(agentID),
-                                          cloneTreasureCollectionKnowledge(agentID),
-                                          cloneAgentPreferences(agentID));
-        break;
-      case MAP_EXPLORE:
-        dataContainer = new DataContainer(cloneGraph(agentID),
-                                          cloneTreasures(agentID),
-                                          cloneTankerAgentKnowledge(agentID),
-                                          null,
-                                          cloneAgentPreferences(agentID));
-        break;
-      default:
-        dataContainer = new DataContainer(cloneGraph(agentID),
-                                          cloneTreasures(agentID),
-                                          null,
-                                          cloneTreasureCollectionKnowledge(agentID),
-                                          cloneAgentPreferences(agentID));
-        break;
 
-    }*/
-    //return Optional.of(dataContainer);
     return new DataContainer(cloneGraph(agentID),
                              cloneTreasures(agentID),
-                             cloneTankerAgentKnowledge(agentID),
+                             cloneTankerAgentKnowledges(agentID),
                              cloneTreasureCollectionKnowledge(agentID),
                              cloneAgentPreferences(agentID));
   }
@@ -524,8 +559,9 @@ public final class AgentKnowledge implements Serializable {
     System.out.println(agent.getLocalName() + " update treasures from " + agentID);
   }
   
+  /*
   private void updateTankerAgentKnowledge(String agentID, Optional<Couple<String, Couple<String, List<String>>>> tankerAgentKnowledgeContainer) {
-    if (tankerAgentKnowledgeContainer.isEmpty() || isTankerAgent || knowsTankerAgent()) {
+    if (tankerAgentKnowledgeContainer.isEmpty() || isTankerAgent() || knowsTankerAgent()) {
       return;
     }
     var tankerAgentKnowledge = tankerAgentKnowledgeContainer.get();
@@ -535,6 +571,28 @@ public final class AgentKnowledge implements Serializable {
     dataShareTracker.setTankerAgentKnowledgeSendingStatus(agentID, false);
     System.out.println(agent.getLocalName() + " knows tanker agent from " + agentID);
     //System.out.println(tankerAgentKnowledge);
+  }*/
+  
+  private void updateTankerAgentKnowledges(String agentID, Optional<Map<String, Couple<String, List<String>>>> tankerAgentKnowledgesContainer) {
+    if (tankerAgentKnowledgesContainer.isEmpty()) {
+      return;
+    }
+    var tankerAgentKnowledges = tankerAgentKnowledgesContainer.get();
+    if (tankerAgentKnowledges.equals(this.tankerAgentKnowledges)) {
+      return;
+    }
+    for (var entry: tankerAgentKnowledges.entrySet()) {
+      var tankerAgentName = entry.getKey();
+      var tankerAgentKnowledge = entry.getValue();
+      if (this.tankerAgentKnowledges.containsKey(tankerAgentName)) {
+        continue;
+      }
+      this.tankerAgentKnowledges.put(tankerAgentName,
+                                     new Couple<>(tankerAgentKnowledge.getLeft(),
+                                                  List.copyOf(tankerAgentKnowledge.getRight())));
+    }
+    dataShareTracker.setTankerAgentKnowledgeSendingStatus(agentID, false);
+    System.out.println(agent.getLocalName() + " learns knowledge of tanker agents from " + agentID);
   }
   
   private void updateTreasureCollectionKnowledge(String agentID, Optional<Map<String, Map<Observation, Integer>>> treasureCollectionKnowledgeContainer) {
@@ -576,7 +634,7 @@ public final class AgentKnowledge implements Serializable {
     
     updateGraph(agentID, dataContainer.graph());
     updateTreasures(agentID, dataContainer.treasures());
-    updateTankerAgentKnowledge(agentID, dataContainer.tankerAgentKnowledge());
+    updateTankerAgentKnowledges(agentID, dataContainer.tankerAgentKnowledges());
     updateTreasureCollectionKnowledge(agentID, dataContainer.treasureCollectionKnowledge());
     updatAgentPreferences(agentID, dataContainer.agentPreferences());
   }
@@ -593,7 +651,7 @@ public final class AgentKnowledge implements Serializable {
   }
   
   public boolean knowsTankerAgent() {
-    return tankerAgentKnowledge != null;
+    return !tankerAgentKnowledges.isEmpty();
   }
   
   public Set<String> agentIdentifiers() {
@@ -601,7 +659,11 @@ public final class AgentKnowledge implements Serializable {
   }
   
   public boolean isTankerAgent() {
-    return this.isTankerAgent;
+    return this.agentType.equals(AgentType.TANKER_AGENT);
+  }
+  
+  public boolean isCollectAgent() {
+    return this.agentType.equals(AgentType.COLLECT_AGENT);
   }
   
   public WaitingProtocolsList waitingProtocolsList() {
@@ -627,22 +689,23 @@ public final class AgentKnowledge implements Serializable {
     return this.destinationPositionID;
   }
   
-  
   public boolean allAgentsTerminate() {
-    return agentTerminationsRegister.values().stream()
+    //System.out.println(agentTerminationsRegister);
+    return agentTerminationsRegister.entrySet().stream()
+        .filter(e -> !tankerAgentKnowledges.containsKey(e.getKey()))
+        .map(Entry::getValue)
         .allMatch(terminate -> terminate);
   }
-  
   
   public void setAgentTermination(String agentID) {
     Objects.requireNonNull(agentID);
     validateAgentIdentifier(agentID);
-    if (!isTankerAgent) {
+    if (!isTankerAgent()) {
       throw new IllegalStateException("Only the tanker agent contains the knowledge of the agent terminations");
     }
     agentTerminationsRegister.put(agentID, true);
+    System.out.println(agent.getLocalName() + " set termination status of agent " + agentID + " " + System.currentTimeMillis() + " " + agentTerminationsRegister);
   }
-  
   
   public void initializeTankerAgentKnowledge(String tankerAgentName,
                                              String tankerAgentPosition,
@@ -650,36 +713,39 @@ public final class AgentKnowledge implements Serializable {
     Objects.requireNonNull(tankerAgentName);
     Objects.requireNonNull(tankerAgentPosition);
     Objects.requireNonNull(edges);
-    if (!isTankerAgent) {
+    if (!isTankerAgent()) {
       throw new IllegalStateException("Only the tanker agent can intialize the tanker agent's knowledge");
     } 
-    if (tankerAgentKnowledge != null) {
+    if (!tankerAgentKnowledges.isEmpty()) {
       throw new IllegalStateException("The knowledge of the tanker agent has already been initialized");
     }
+    /*
     this.tankerAgentKnowledge = new Couple<>(tankerAgentName,
                                              new Couple<>(tankerAgentPosition, edges));
+                                             */
+    tankerAgentKnowledges.put(tankerAgentName, new Couple<>(tankerAgentPosition, edges));
     dataShareTracker.setTankerAgentKnowledgeSendingStatus(false);
   }
   
-  
+  /*
   public String getTankerAgentName() {
     if (!knowsTankerAgent()) {
       throw new IllegalStateException("Agent " + agent.getLocalName() + " is not aware of the existence of the tanker agent");
     }
-    return tankerAgentKnowledge.getLeft();
-  }
+    //return tankerAgentKnowledge.getLeft();
+    return "Tom";
+  }*/
   
   public AgentMode mode() {
     return this.mode;
   }
   
   public void setAgentMode(AgentMode mode) {
-    if (isTankerAgent) {
+    if (isTankerAgent()) {
       throw new IllegalStateException("The tanker agent operating mode cannot be changed");
     }
     this.mode = mode;
   }
-  
   
   public void computeTreasureNumberRegister() {
     var numberOfGold = treasures.values().stream()
@@ -689,12 +755,22 @@ public final class AgentKnowledge implements Serializable {
     treasureNumberRegister.put(Observation.DIAMOND, (int)(treasures.size() - numberOfGold));
   }
   
+  public void initializeTerminationInformAcks() {
+    if (!terminationInformAcks.isEmpty()) {
+      throw new IllegalStateException("The termination inform acks has aleady been initialized");
+    }
+    if (isTankerAgent()) {
+      throw new IllegalStateException("The tanker agent cannot initialize the termination inform acks");
+    }
+    for (var tankerAgentName: tankerAgentKnowledges.keySet()) {
+      terminationInformAcks.put(tankerAgentName, false);
+    }
+  }
   
   public void increaseMyTreasureCollectionCounter() {
     treasureCollectionKnowledge.get(agent.getLocalName()).merge(agent.getMyTreasureType(), 1, Integer::sum);
     dataShareTracker.setTreasureCollectionKnowledgeSendingStatus(false);
   }
-  
   
   public int numberOfCompletedTask() {
     return treasureCollectionKnowledge.values().stream()
@@ -702,13 +778,11 @@ public final class AgentKnowledge implements Serializable {
         .reduce(0, Integer::sum);
   }
   
-  
   public int numberOfCompletedTaskOfMyType() {
     return treasureCollectionKnowledge.values().stream()
         .mapToInt(map -> map.get(agent.getMyTreasureType()))
         .reduce(0, Integer::sum);
   }
-  
   
   public boolean isTreasureCollectionTaskCompleted() {
     var totalNumberOfTreasures = treasureNumberRegister.values().stream()
@@ -720,7 +794,7 @@ public final class AgentKnowledge implements Serializable {
       return true;
     }
     var isAnotherTypeOfAgent = agentPreferences.entrySet().stream()
-        .filter(e -> !e.getKey().equals(tankerAgentKnowledge.getLeft())
+        .filter(e -> !tankerAgentKnowledges.containsKey(e.getKey())
             && !e.getValue().equals(agent.getMyTreasureType()))
         .findAny()
         .isPresent();
@@ -734,8 +808,8 @@ public final class AgentKnowledge implements Serializable {
   }
   
   public int currentPackCapacity() {
-    if (isTankerAgent) {
-      throw new IllegalStateException("The tanker agent does not have packaging capacity");
+    if (!isCollectAgent()) {
+      throw new IllegalStateException("The tanker agent or explore agent does not have packaging capacity");
     }
     return agent.getBackPackFreeSpace().stream()
         .filter(couple -> couple.getLeft().equals(agent.getMyTreasureType()))
@@ -760,10 +834,49 @@ public final class AgentKnowledge implements Serializable {
     this.randomSelectedPositions = null;
   }
   
-  public void print() {
-    System.err.println(treasures);
-    System.err.println(treasureCollectionKnowledge);
-    System.err.println(treasureNumberRegister);
-    System.err.println(agentPreferences);
+  public AgentType agentType() {
+    return this.agentType;
+  }
+  
+  public void receiveTerminationInformAckFrom(String agentID) {
+    Objects.requireNonNull(agentID);
+    validateAgentIdentifier(agentID);
+    if (!terminationInformAcks.containsKey(agentID)) {
+      throw new IllegalArgumentException("Unknown tanker agent name: " + agentID + " for agent " + agent.getLocalName());
+    }
+    terminationInformAcks.put(agentID, true);
+  }
+  
+  public boolean receiveAllTerminationInformAcks() {
+    return terminationInformAcks.values().stream()
+        .allMatch(ack -> ack);
+  }
+  
+  public boolean isTankerAgentID(String agentID) {
+    Objects.requireNonNull(agentID);
+    validateAgentIdentifier(agentID);
+    return tankerAgentKnowledges.containsKey(agentID);
+  }
+  
+  public boolean isTerminationInformAckDone(String agentID) {
+    Objects.requireNonNull(agentID);
+    validateAgentIdentifier(agentID);
+    return terminationInformAcks.get(agentID);
+  }
+  
+  public void showAgentKnowledge() {
+    System.out.println(agent.getLocalName() + ":");
+    System.out.println("Treasures knowledge=" + treasures);
+    System.out.println("Treasure collection knowledge=" + treasureCollectionKnowledge);
+    System.out.println("Treasure number=" + treasureNumberRegister);
+    System.out.println("Agent preferences=" + agentPreferences);
+    System.out.println("Tanker agent knowledge" + tankerAgentKnowledges);
+    if (isTankerAgent()) {
+      System.out.println("Agent termination=" + agentTerminationsRegister);
+    }
+    else {
+      System.out.println("Termination inform ack=" + terminationInformAcks);
+    }
+    System.out.println("\n");
   }
 }
