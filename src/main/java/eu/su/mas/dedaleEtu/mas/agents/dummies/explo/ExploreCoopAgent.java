@@ -90,6 +90,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
 		 ************************************************/
 		
 		// lb.add(new ExploCoopBehaviour(this,this.myMap,list_agentNames));
+		/*
     var fsm = new FSMBehaviour();
     
     var agentKnowledge = new AgentKnowledge(this, listAgentNames, false);
@@ -161,7 +162,7 @@ public class ExploreCoopAgent extends AbstractDedaleAgent {
     
     lb.add(fsm);
 
-		
+		*/
 		
 		/***
 		 * MANDATORY TO ALLOW YOUR AGENT TO BE DEPLOYED CORRECTLY
