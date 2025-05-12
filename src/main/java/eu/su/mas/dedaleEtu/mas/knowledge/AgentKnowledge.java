@@ -156,6 +156,10 @@ public final class AgentKnowledge implements Serializable {
     }
   }
   
+  public boolean canContinueToCollect() {
+    return currentPackCapacity() > 0 && !pickableTreasurePositions().isEmpty();
+  }
+  
   private boolean updateTreasureFromObservation(Treasure treasure,
                                                 String treasureNodeID,
                                                 List<Couple<Observation, String>> observation) {
@@ -854,7 +858,7 @@ public final class AgentKnowledge implements Serializable {
   
   public boolean isTankerAgentID(String agentID) {
     Objects.requireNonNull(agentID);
-    validateAgentIdentifier(agentID);
+    //validateAgentIdentifier(agentID);
     return tankerAgentKnowledges.containsKey(agentID);
   }
   

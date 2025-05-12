@@ -339,7 +339,7 @@ public class Principal {
 		 * AGENT Explo1
 		 *********/
 		//1) Get the container where the agent will appear
-		c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+		/*c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
 		Assert.assertNotNull("This container does not exist",c);
 
 		//2) Give the name of your agent, MUST be the same as the one given in the entities file.
@@ -353,9 +353,6 @@ public class Principal {
 		ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersExplo1);//ExploreSoloAgent
 		agentList.add(ag);
 
-		/*********
-		 * AGENT Explo2
-		 *********/
 						//1) Get the container where the agent will appear
 				c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
 				Assert.assertNotNull("This container does not exist",c);
@@ -370,11 +367,7 @@ public class Principal {
 				ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersExplo2);//ExploreSoloAgent
 				agentList.add(ag);
 
-		//		
-		//		
-		/*********
-		 * AGENT Explo3
-		 *********/
+		//	
 				//1) Get the container where the agent will appear
 				c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
 				Assert.assertNotNull("This container does not exist",c);
@@ -432,8 +425,72 @@ public class Principal {
         //4) Give the class name of your agent to let the system instantiate it
         //ag=createNewDedaleAgent(c, agentName, ExploreAgent.class.getName(), entityParametersExplo6);//ExploreSoloAgent
         
-        //agentList.add(ag);
+        //agentList.add(ag);*/
 
+		
+		
+		
+		
+		c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "C1";
+    Object [] entityParametersCollect1 = { "C2", "C3", "C4", "Tank" };
+    ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersCollect1);
+    agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "C2";
+    Object [] entityParametersCollect2 = { "C1", "C3", "C4", "Tank" };
+    ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersCollect2);
+    agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "C3";
+    Object [] entityParametersCollect3 = { "C2", "C1", "C4", "Tank" };
+    ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersCollect3);
+    agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "C4";
+    Object [] entityParametersCollect4 = { "C1", "C2", "C3", "Tank" };
+    ag=createNewDedaleAgent(c, agentName, CollectAgent.class.getName(), entityParametersCollect4);
+    agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "Tank";
+    Object [] entityParametersTank1 = { "C1", "C2", "C3", "C4" };
+    ag=createNewDedaleAgent(c, agentName, TankerAgent.class.getName(), entityParametersTank1);
+    agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "E1";
+    Object [] entityParametersExplo1 = { "C1", "C2", "C3", "C4", "Tank" };
+    ag=createNewDedaleAgent(c, agentName, ExploreAgent.class.getName(), entityParametersExplo1);
+    //agentList.add(ag);
+		
+    
+    
+    
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "G1";
+    Object [] entityParametersWumpus1 = {};
+    ag=createNewDedaleAgent(c, agentName, DummyWumpusShift.class.getName(), entityParametersWumpus1);
+    //agentList.add(ag);
+    
+    c = containerList.get(ConfigurationFile.LOCAL_CONTAINER2_NAME);
+    Assert.assertNotNull("This container does not exist",c);
+    agentName = "G2";
+    Object [] entityParametersWumpus2 = {};
+    ag=createNewDedaleAgent(c, agentName, DummyWumpusShift.class.getName(), entityParametersWumpus2);
+    //agentList.add(ag);
+		
 		/*********
 		 * AGENT Explo4
 		 *********/

@@ -9,6 +9,7 @@ import eu.su.mas.dedale.env.Observation;
 import eu.su.mas.dedale.env.gs.GsLocation;
 import eu.su.mas.dedale.mas.AbstractDedaleAgent;
 import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge;
+import eu.su.mas.dedaleEtu.mas.knowledge.AgentKnowledge.AgentMode;
 import jade.core.behaviours.OneShotBehaviour;
 
 public final class SolveDeadlockBehaviour extends OneShotBehaviour {
@@ -48,7 +49,7 @@ public final class SolveDeadlockBehaviour extends OneShotBehaviour {
           .allMatch(couple -> couple.getRight().stream()
               .allMatch(observation -> !observation.getLeft().equals(Observation.AGENTNAME)));
       if (canMoveTo) {
-        //agentKnowledge.setAttemptPositionID(attemptPositionID);
+        agentKnowledge.setAttemptPositionID(attemptPositionID);
         System.out.println("Agent " + agent.getLocalName() + " moves from " + currentPositionID + " to " + attemptPositionID);
         agent.moveTo(new GsLocation(attemptPositionID));
         return;
@@ -57,7 +58,14 @@ public final class SolveDeadlockBehaviour extends OneShotBehaviour {
     
     observations = agent.observe();
     if (agentKnowledge.computeShortestPathToDestination(observations)) {
+      agentKnowledge.setAttemptPositionID(null);
       System.out.println("Agent " + myAgent.getLocalName() + " uses another shortest path from " + currentPositionID);
+      return;
+    }
+    
+    if (agentKnowledge.mode().equals(AgentMode.EMPTY_PACKAGE)) {
+      agentKnowledge.resetShortestPath();
+      agentKnowledge.setAttemptPositionID(null);
       return;
     }
     

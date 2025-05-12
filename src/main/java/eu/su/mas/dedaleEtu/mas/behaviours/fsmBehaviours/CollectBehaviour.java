@@ -72,6 +72,14 @@ public final class CollectBehaviour extends OneShotBehaviour {
         agentKnowledge.increaseMyTreasureCollectionCounter();
         //System.out.println(agent.getLocalName());
       }
+      
+      //if (agentKnowledge.currentPackCapacity() > 0 && !agentKnowledge.pickableTreasurePositions().isEmpty()) {
+      
+      
+      if (agentKnowledge.canContinueToCollect()) {  
+        nextStateTransition = 1;
+        return;
+      }
       nextStateTransition = 0; // Go to empty pack phase.
       agentKnowledge.setAgentMode(AgentMode.EMPTY_PACKAGE);
       return;
